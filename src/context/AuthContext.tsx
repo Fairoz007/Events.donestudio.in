@@ -38,12 +38,12 @@ interface AuthContextType {
   updateUserPoints: (addPoints: number, reason: string) => void;
 }
 
-const DEFAULT_SUPER_ADMIN: UserProfile = {
-  clerkUserId: "user_super_admin_01",
-  username: "done_admin",
-  displayName: "D-One Super Admin",
-  avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=done_admin",
-  email: "admin@donestudio.events",
+const DEFAULT_USER_FAIROZ: UserProfile = {
+  clerkUserId: "user_fairoz_01",
+  username: "fairoz",
+  displayName: "Fairoz",
+  avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80",
+  email: "fairoz@donestudio.events",
   country: "IN",
   role: "super_admin",
   points: 15400,
@@ -62,12 +62,12 @@ const DEFAULT_SUPER_ADMIN: UserProfile = {
 };
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isSignedIn: false,
-  isLoaded: false,
-  isAdmin: false,
-  isSuperAdmin: false,
-  isCreator: false,
+  user: DEFAULT_USER_FAIROZ,
+  isSignedIn: true,
+  isLoaded: true,
+  isAdmin: true,
+  isSuperAdmin: true,
+  isCreator: true,
   login: () => {},
   logout: () => {},
   switchDemoRole: () => {},
@@ -75,80 +75,76 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(DEFAULT_USER_FAIROZ);
+  const [isLoaded, setIsLoaded] = useState(true);
 
   useEffect(() => {
-    // Load persisted session from localStorage
-    const saved = localStorage.getItem("done_active_user");
-    if (saved) {
-      try {
-        setUser(JSON.parse(saved));
-      } catch (e) {
-        setUser(DEFAULT_SUPER_ADMIN);
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("done_active_user");
+      if (saved) {
+        try {
+          setUser(JSON.parse(saved));
+        } catch (e) {
+          setUser(DEFAULT_USER_FAIROZ);
+        }
+      } else {
+        setUser(DEFAULT_USER_FAIROZ);
+        localStorage.setItem("done_active_user", JSON.stringify(DEFAULT_USER_FAIROZ));
       }
-    } else {
-      // Default to Super Admin so all reviewer features are immediately testable
-      setUser(DEFAULT_SUPER_ADMIN);
-      localStorage.setItem("done_active_user", JSON.stringify(DEFAULT_SUPER_ADMIN));
     }
-    setIsLoaded(true);
   }, []);
 
   const login = (profile: Partial<UserProfile>) => {
     const fullUser: UserProfile = {
       clerkUserId: profile.clerkUserId || `user_${Date.now()}`,
-      username: profile.username || "player_one",
-      displayName: profile.displayName || "D-One Player",
-      avatarUrl: profile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${Date.now()}`,
-      email: profile.email || "player@donestudio.events",
+      username: profile.username || "fairoz",
+      displayName: profile.displayName || "Fairoz",
+      avatarUrl: profile.avatarUrl || DEFAULT_USER_FAIROZ.avatarUrl,
+      email: profile.email || "fairoz@donestudio.events",
       country: profile.country || "IN",
-      role: profile.role || "user",
-      points: profile.points || 100,
-      level: profile.level || 1,
-      joinDate: profile.joinDate || new Date().toISOString().split("T")[0],
+      role: profile.role || "super_admin",
+      points: profile.points || 15400,
+      level: profile.level || 13,
+      joinDate: profile.joinDate || "2026-08-01",
       isSuspended: false,
       isBanned: false,
-      stats: profile.stats || {
-        vadamvaliWins: 0,
-        vadamvaliLosses: 0,
-        quizzesTaken: 0,
-        quizHighScore: 0,
-        pookalamsSubmitted: 0,
-        pookalamVotesReceived: 0,
-      },
+      stats: profile.stats || DEFAULT_USER_FAIROZ.stats,
     };
     setUser(fullUser);
-    localStorage.setItem("done_active_user", JSON.stringify(fullUser));
+    if (typeof window !== "undefined") {
+      localStorage.setItem("done_active_user", JSON.stringify(fullUser));
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("done_active_user");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("done_active_user");
+    }
   };
 
   const switchDemoRole = (role: "user" | "creator" | "admin" | "super_admin") => {
-    if (!user) {
-      setUser({ ...DEFAULT_SUPER_ADMIN, role });
-      localStorage.setItem("done_active_user", JSON.stringify({ ...DEFAULT_SUPER_ADMIN, role }));
-      return;
-    }
-    const updated = { ...user, role };
+    const base = user || DEFAULT_USER_FAIROZ;
+    const updated = { ...base, role };
     setUser(updated);
-    localStorage.setItem("done_active_user", JSON.stringify(updated));
+    if (typeof window !== "undefined") {
+      localStorage.setItem("done_active_user", JSON.stringify(updated));
+    }
   };
 
   const updateUserPoints = (addPoints: number, reason: string) => {
-    if (!user) return;
-    const newPoints = user.points + addPoints;
+    const base = user || DEFAULT_USER_FAIROZ;
+    const newPoints = base.points + addPoints;
     const newLevel = Math.max(1, Math.floor(Math.sqrt(newPoints / 100)) + 1);
     const updated: UserProfile = {
-      ...user,
+      ...base,
       points: newPoints,
       level: newLevel,
     };
     setUser(updated);
-    localStorage.setItem("done_active_user", JSON.stringify(updated));
+    if (typeof window !== "undefined") {
+      localStorage.setItem("done_active_user", JSON.stringify(updated));
+    }
   };
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";

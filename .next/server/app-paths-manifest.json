@@ -1,4 +1,9 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/page": "app/page.js"
+  "/page": "app/page.js",
+  "/events/page": "app/events/page.js",
+  "/events/[slug]/page": "app/events/[slug]/page.js",
+  "/events/[slug]/vadamvali/page": "app/events/[slug]/vadamvali/page.js",
+  "/events/[slug]/quiz/page": "app/events/[slug]/quiz/page.js",
+  "/events/[slug]/pookalam/page": "app/events/[slug]/pookalam/page.js",
+  "/events/[slug]/pookalam/gallery/page": "app/events/[slug]/pookalam/gallery/page.js"
 }
