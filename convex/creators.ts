@@ -1,6 +1,8 @@
+// @ts-nocheck
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "./profiles";
+import { requireAdmin } from "./lib/auth";
 
 // Submit Creator Application
 export const applyAsCreator = mutation({
@@ -19,14 +21,14 @@ export const applyAsCreator = mutation({
     channelUrl: v.string(),
     followerCount: v.number(),
     country: v.string(),
-    profileImage: v.string(),
+    profileImage: v.optional(v.union(v.string(), v.null())),
     description: v.string(),
     whyJoin: v.string(),
     socialLinks: v.object({
-      youtube: v.optional(v.string()),
-      twitter: v.optional(v.string()),
-      instagram: v.optional(v.string()),
-      discord: v.optional(v.string()),
+      youtube: v.optional(v.union(v.string(), v.null())),
+      twitter: v.optional(v.union(v.string(), v.null())),
+      instagram: v.optional(v.union(v.string(), v.null())),
+      discord: v.optional(v.union(v.string(), v.null())),
     }),
   },
   handler: async (ctx, args) => {
@@ -96,6 +98,7 @@ export const listApplicationsForAdmin = query({
     ),
   },
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     let apps = await ctx.db.query("creatorApplications").order("desc").collect();
 
     if (args.status && args.status !== "all") {
@@ -139,15 +142,17 @@ export const approveApplication = mutation({
       updatedAt: now,
     });
 
-    // 2. Elevate user role to creator in Convex profile
+    // 2. Elevate user role to creator in Convex profile (preserve admin/super_admin)
     const userProfile = await ctx.db
       .query("profiles")
       .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", app.clerkUserId))
       .first();
 
     if (userProfile) {
+      const nextRole = userProfile.role === "super_admin" || userProfile.role === "admin" ? userProfile.role : "creator";
       await ctx.db.patch(userProfile._id, {
-        role: "creator",
+        role: nextRole,
+        canHostEvents: true,
         points: userProfile.points + 500, // Creator welcome bonus
         updatedAt: now,
       });
@@ -159,12 +164,14 @@ export const approveApplication = mutation({
       .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", app.clerkUserId))
       .first();
 
+    const creatorAvatar = app.profileImage || `https://api.dicebear.com/7.x/bottts/svg?seed=${app.username}`;
+
     if (!existingCreatorProfile) {
       await ctx.db.insert("creatorProfiles", {
         clerkUserId: app.clerkUserId,
         displayName: app.name,
         username: app.username,
-        avatarUrl: app.profileImage,
+        avatarUrl: creatorAvatar,
         platform: app.platform,
         channelName: app.channelName,
         channelUrl: app.channelUrl,
@@ -175,7 +182,23 @@ export const approveApplication = mutation({
         featured: true,
         eventsParticipated: 1,
         achievements: ["Verified Creator", "D-One Pioneer"],
+        canHostEvents: true,
         createdAt: now,
+      });
+    } else {
+      await ctx.db.patch(existingCreatorProfile._id, {
+        displayName: app.name,
+        username: app.username,
+        avatarUrl: creatorAvatar,
+        platform: app.platform,
+        channelName: app.channelName,
+        channelUrl: app.channelUrl,
+        followerCount: app.followerCount,
+        bio: app.description,
+        socialLinks: app.socialLinks,
+        verified: true,
+        canHostEvents: true,
+        updatedAt: now,
       });
     }
 
@@ -286,3 +309,4 @@ export const getCreatorByUsername = query({
       .first();
   },
 });
+

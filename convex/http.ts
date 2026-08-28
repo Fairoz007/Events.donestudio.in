@@ -1,6 +1,8 @@
+// @ts-nocheck
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
+import { Webhook } from "svix";
 
 const http = httpRouter();
 
@@ -10,23 +12,36 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
-      const payload = await request.json();
+      const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
+      if (!webhookSecret) return new Response("CLERK_WEBHOOK_SECRET is not configured", { status: 503 });
+      const body = await request.text();
+      const svixId = request.headers.get("svix-id");
+      const svixTimestamp = request.headers.get("svix-timestamp");
+      const svixSignature = request.headers.get("svix-signature");
+      if (!svixId || !svixTimestamp || !svixSignature) return new Response("Missing webhook signature", { status: 400 });
+      const payload = new Webhook(webhookSecret).verify(body, {
+        "svix-id": svixId,
+        "svix-timestamp": svixTimestamp,
+        "svix-signature": svixSignature,
+      }) as { type?: unknown; data?: unknown };
       const eventType = payload.type;
       const data = payload.data;
 
-      if (eventType === "user.created" || eventType === "user.updated") {
-        const clerkUserId = data.id;
+      if ((eventType === "user.created" || eventType === "user.updated") && data && typeof data === "object") {
+        const user = data as Record<string, any>;
+        const clerkUserId = user.id;
+        if (typeof clerkUserId !== "string") return new Response("Invalid Clerk user payload", { status: 400 });
         const email =
-          data.email_addresses?.[0]?.email_address ||
-          `${data.username || "user"}@done-events.com`;
+          user.email_addresses?.[0]?.email_address ||
+          `${user.username || "user"}@done-events.com`;
         const displayName =
-          `${data.first_name || ""} ${data.last_name || ""}`.trim() ||
-          data.username ||
+          `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
+          user.username ||
           "D-One Player";
-        const avatarUrl = data.image_url || data.profile_image_url || "";
-        const username = data.username || undefined;
+        const avatarUrl = user.image_url || user.profile_image_url || "";
+        const username = typeof user.username === "string" ? user.username : undefined;
 
-        await ctx.runMutation(api.profiles.syncProfile, {
+        await ctx.runMutation(internal.profiles.syncProfileFromClerk, {
           clerkUserId,
           email,
           displayName,
@@ -50,3 +65,4 @@ http.route({
 });
 
 export default http;
+

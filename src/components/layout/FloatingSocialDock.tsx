@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { MessageCircle, Instagram, Youtube, Disc as DiscordIcon } from "lucide-react";
+import { MessageCircle, Instagram, Youtube } from "lucide-react";
 import { soundFx } from "@/lib/sounds";
 
 export function FloatingSocialDock() {

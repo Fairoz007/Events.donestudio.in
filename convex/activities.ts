@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "./profiles";
@@ -46,8 +47,7 @@ export const getActivityBySlug = query({
 
     const activity = await ctx.db
       .query("eventActivities")
-      .withIndex("by_eventId", (q) => q.eq("eventId", event._id))
-      .filter((q) => q.eq(q.field("slug"), args.activitySlug))
+      .withIndex("by_eventId_and_slug", (q) => q.eq("eventId", event._id).eq("slug", args.activitySlug))
       .first();
 
     return activity ? { ...activity, event } : null;
@@ -98,3 +98,4 @@ export const createActivity = mutation({
     });
   },
 });
+

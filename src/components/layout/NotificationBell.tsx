@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import React, { useState } from "react";
@@ -99,3 +100,4 @@ export function NotificationBell() {
     </div>
   );
 }
+

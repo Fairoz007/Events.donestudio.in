@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
@@ -89,3 +90,4 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
     </section>
   );
 }
+

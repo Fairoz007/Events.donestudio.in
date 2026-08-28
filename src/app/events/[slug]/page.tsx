@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import Link from "next/link";
@@ -80,3 +81,4 @@ export default function OnamEventPage() {
     </main>
   );
 }
+

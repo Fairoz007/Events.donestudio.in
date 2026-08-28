@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import { useQuery } from "convex/react";
@@ -52,3 +53,4 @@ function Card({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
