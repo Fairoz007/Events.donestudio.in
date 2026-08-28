@@ -7,6 +7,7 @@ import { ArrowRight, HelpCircle, Palette, Trophy } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { soundFx } from "@/lib/sounds";
+import { useStableNow } from "@/lib/useStableNow";
 
 const cards = [
   {
@@ -39,7 +40,8 @@ const cards = [
 ];
 
 export function ActivitiesShowcase() {
-  const summary = useQuery(api.onam.getSummary, { now: Date.now() });
+  const now = useStableNow();
+  const summary = useQuery(api.onam.getSummary, { now });
 
   return (
     <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">

@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { CalendarClock, CheckCircle2, Play, Trophy, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useStableNow } from "@/lib/useStableNow";
 
 function fmt(value?: number) {
   if (!value) return "Not set";
@@ -14,9 +15,10 @@ function fmt(value?: number) {
 
 export default function VadamvaliPage() {
   const { isAdmin } = useAuth();
-  const summary = useQuery(api.onam.getSummary, { now: Date.now() });
+  const now = useStableNow();
+  const summary = useQuery(api.onam.getSummary, { now });
   const fixture = useQuery(api.onam.listFixture);
-  const my = useQuery(api.onam.getMyOnam, { now: Date.now() });
+  const my = useQuery(api.onam.getMyOnam, { now });
   const register = useMutation(api.onam.registerForActivity);
   const generate = useMutation(api.onam.generateVadamvaliFixture);
   const openCheckIn = useMutation(api.onam.openNextMatchCheckIn);

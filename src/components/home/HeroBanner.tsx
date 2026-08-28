@@ -7,6 +7,7 @@ import { ArrowRight, CalendarClock, Radio, Users } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { soundFx } from "@/lib/sounds";
+import { useStableNow } from "@/lib/useStableNow";
 
 function formatTime(value?: number) {
   if (!value) return "Configured in Convex";
@@ -18,7 +19,8 @@ function formatTime(value?: number) {
 }
 
 export function HeroBanner() {
-  const summary = useQuery(api.onam.getSummary, { now: Date.now() });
+  const now = useStableNow();
+  const summary = useQuery(api.onam.getSummary, { now });
   const event = summary?.event;
   const statusLabel =
     summary?.registrationStatus === "open"

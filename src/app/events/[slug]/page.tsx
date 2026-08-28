@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { ArrowRight, CalendarClock, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useStableNow } from "@/lib/useStableNow";
 
 function fmt(value?: number) {
   if (!value) return "Configured in Convex";
@@ -14,7 +15,8 @@ function fmt(value?: number) {
 
 export default function OnamEventPage() {
   const { isSignedIn } = useAuth();
-  const summary = useQuery(api.onam.getSummary, { now: Date.now() });
+  const now = useStableNow();
+  const summary = useQuery(api.onam.getSummary, { now });
   const register = useMutation(api.onam.registerForOnam);
 
   return (

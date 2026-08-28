@@ -7,6 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Bell, CalendarClock, FileCheck, Palette, Trophy } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useStableNow } from "@/lib/useStableNow";
 
 function fmt(value?: number) {
   if (!value) return "Not scheduled";
@@ -15,7 +16,8 @@ function fmt(value?: number) {
 
 export default function DashboardPage() {
   const { isSignedIn } = useAuth();
-  const data = useQuery(api.onam.getMyOnam, { now: Date.now() });
+  const now = useStableNow();
+  const data = useQuery(api.onam.getMyOnam, { now });
 
   if (!isSignedIn) {
     return (

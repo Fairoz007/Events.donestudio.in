@@ -4,6 +4,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Play, Radio } from "lucide-react";
+import { useStableNow } from "@/lib/useStableNow";
 
 function fmt(value?: number) {
   if (!value) return "Not set";
@@ -11,7 +12,8 @@ function fmt(value?: number) {
 }
 
 export default function StreamerControlPage() {
-  const summary = useQuery(api.onam.getSummary, { now: Date.now() });
+  const now = useStableNow();
+  const summary = useQuery(api.onam.getSummary, { now });
   const fixture = useQuery(api.onam.listFixture);
   const openCheckIn = useMutation(api.onam.openNextMatchCheckIn);
   const start = useMutation(api.onam.startReadyMatch);

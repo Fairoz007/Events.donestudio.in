@@ -3,10 +3,12 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useStableNow } from "@/lib/useStableNow";
 
 export default function LeaderboardsPage() {
   const fixture = useQuery(api.onam.listFixture);
-  const summary = useQuery(api.onam.getSummary, { now: Date.now() });
+  const now = useStableNow();
+  const summary = useQuery(api.onam.getSummary, { now });
   const matches = fixture?.matches || [];
   const completed = matches.filter((m) => ["completed", "walkover"].includes(m.status));
   const champion = fixture?.tournament.championClerkUserId;
