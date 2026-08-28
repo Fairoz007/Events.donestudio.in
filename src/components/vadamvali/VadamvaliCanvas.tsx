@@ -6,16 +6,14 @@ interface VadamvaliCanvasProps {
   ropePosition: number; // -100 (Player 1 win) to +100 (Player 2 win), 0 is center
   isPullingP1: boolean;
   isPullingP2: boolean;
-  player1Name: string;
-  player2Name: string;
+  player1Name?: string;
+  player2Name?: string;
 }
 
 export function VadamvaliCanvas({
   ropePosition,
   isPullingP1,
   isPullingP2,
-  player1Name,
-  player2Name,
 }: VadamvaliCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -80,9 +78,6 @@ export function VadamvaliCanvas({
 
       // Curved wavy rope physics
       ctx.beginPath();
-      const p1HandX = centerX - 180 + ropeShift;
-      const p2HandX = centerX + 180 + ropeShift;
-
       ctx.moveTo(0, ropeY + Math.sin(time * 2) * 2);
       ctx.quadraticCurveTo(
         centerX + ropeShift,

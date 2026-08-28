@@ -1,15 +1,27 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "./profiles";
+import { requireAdmin } from "./lib/auth";
 
-// Get Quiz metadata by slug
+// Get Quiz metadata by slug with fallback
 export const getQuizBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const directMatch = await ctx.db
       .query("quizzes")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .first();
+
+    if (directMatch) return directMatch;
+
+    // Fallback: search for onam trivia or first available active quiz
+    const allQuizzes = await ctx.db.query("quizzes").take(10);
+    const fallback =
+      allQuizzes.find((q) => q.slug.includes("onam") || q.slug.includes("quiz") || q.slug.includes("trivia")) ||
+      allQuizzes[0] ||
+      null;
+
+    return fallback;
   },
 });
 
@@ -33,8 +45,23 @@ export const getQuizQuestionsForPlayer = query({
         points: q.points,
         difficulty: q.difficulty,
         imageUrl: q.imageUrl,
-        // Note: correctOptionIndex and explanation are NOT included here!
       }));
+  },
+});
+
+// Get user's current or latest quiz session
+export const getUserActiveSession = query({
+  args: { quizId: v.id("quizzes") },
+  handler: async (ctx, args) => {
+    const clerkUserId = await getAuthUserId(ctx);
+    if (!clerkUserId) return null;
+    return await ctx.db
+      .query("quizSessions")
+      .withIndex("by_quiz_and_user", (q) =>
+        q.eq("quizId", args.quizId).eq("clerkUserId", clerkUserId)
+      )
+      .order("desc")
+      .first();
   },
 });
 
@@ -44,6 +71,9 @@ export const startQuizSession = mutation({
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
     if (!clerkUserId) throw new Error("Unauthorized: Please sign in to play the Quiz");
+
+    const quiz = await ctx.db.get(args.quizId);
+    if (!quiz) throw new Error("Quiz not found");
 
     // Look for uncompleted session
     const existing = await ctx.db
@@ -68,6 +98,9 @@ export const startQuizSession = mutation({
       answers: [],
       isCompleted: false,
       startedAt: now,
+      questionStartedAt: now,
+      correctAnswers: 0,
+      totalResponseTimeMs: 0,
     });
 
     return await ctx.db.get(sessionId);
@@ -80,7 +113,6 @@ export const submitAnswer = mutation({
     sessionId: v.id("quizSessions"),
     questionIndex: v.number(),
     selectedOption: v.number(),
-    timeTakenSeconds: v.number(),
   },
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
@@ -90,6 +122,8 @@ export const submitAnswer = mutation({
     if (!session) throw new Error("Session not found");
     if (session.clerkUserId !== clerkUserId) throw new Error("Unauthorized");
     if (session.isCompleted) throw new Error("Quiz already completed");
+    const quiz = await ctx.db.get(session.quizId);
+    if (!quiz) throw new Error("Quiz not found");
 
     // Fetch quiz questions
     const questions = await ctx.db
@@ -109,8 +143,10 @@ export const submitAnswer = mutation({
     if (isCorrect) {
       newStreak += 1;
       const basePoints = currentQ.points || 100;
-      // Speed bonus: up to 50 bonus points if answered within 5 seconds
-      const speedBonus = Math.max(0, Math.round((15 - Math.min(args.timeTakenSeconds, 15)) * 3.33));
+      // Speed bonus: up to 50 bonus points if answered within time limit
+      const elapsedMs = Math.max(0, Date.now() - (session.questionStartedAt ?? session.startedAt));
+      const elapsedSeconds = Math.min(elapsedMs / 1000, quiz.timeLimitSeconds);
+      const speedBonus = Math.max(0, Math.round((quiz.speedBonusMax * (quiz.timeLimitSeconds - elapsedSeconds)) / quiz.timeLimitSeconds));
       // Streak bonus: 20 extra points per streak level
       const streakBonus = Math.min(newStreak * 20, 100);
       pointsAwarded = basePoints + speedBonus + streakBonus;
@@ -126,7 +162,7 @@ export const submitAnswer = mutation({
         selectedOption: args.selectedOption,
         isCorrect: isCorrect,
         pointsAwarded: pointsAwarded,
-        timeTakenSeconds: args.timeTakenSeconds,
+        timeTakenSeconds: Math.max(0, (Date.now() - (session.questionStartedAt ?? session.startedAt)) / 1000),
       },
     ];
 
@@ -140,6 +176,9 @@ export const submitAnswer = mutation({
       answers: newAnswers,
       isCompleted: isCompleted,
       completedAt: isCompleted ? Date.now() : undefined,
+      questionStartedAt: isCompleted ? session.questionStartedAt : Date.now(),
+      correctAnswers: (session.correctAnswers ?? 0) + (isCorrect ? 1 : 0),
+      totalResponseTimeMs: (session.totalResponseTimeMs ?? 0) + Math.max(0, Date.now() - (session.questionStartedAt ?? session.startedAt)),
     });
 
     // If completed, finalize and award XP
@@ -204,17 +243,7 @@ export const adminAddQuestion = mutation({
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    const clerkUserId = await getAuthUserId(ctx);
-    if (!clerkUserId) throw new Error("Unauthorized");
-
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-      .first();
-
-    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
-      throw new Error("Forbidden");
-    }
+    await requireAdmin(ctx);
 
     return await ctx.db.insert("quizQuestions", args);
   },

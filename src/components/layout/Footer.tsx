@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Sparkles, Trophy, Users, ShieldCheck, Heart, ArrowUpRight } from "lucide-react";
+import { Users, Heart, ArrowUpRight } from "lucide-react";
 import { soundFx } from "@/lib/sounds";
 
 export function Footer() {

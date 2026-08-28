@@ -2,788 +2,812 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import {
   ShieldCheck,
-  LayoutDashboard,
   Calendar,
   Users,
-  Trophy,
   Flame,
   Sparkles,
-  HelpCircle,
-  Megaphone,
-  History,
+  Trophy,
+  Crown,
+  Bell,
   CheckCircle2,
-  XCircle,
-  Plus,
+  AlertTriangle,
   Trash2,
-  Edit,
-  Search,
-  ArrowUpRight,
-  ExternalLink,
-  ShieldAlert,
+  Lock,
+  FileText,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { INITIAL_EVENTS, INITIAL_CREATORS, INITIAL_POOKALAMS, INITIAL_LEADERBOARD } from "@/lib/mockData";
 import { soundFx } from "@/lib/sounds";
-import confetti from "canvas-confetti";
 
-type AdminTab =
-  | "overview"
-  | "events"
-  | "creators"
-  | "users"
-  | "vadamvali"
-  | "pookalams"
-  | "quizzes"
-  | "announcements"
-  | "audit";
+export default function AdminControlPage() {
+  const { isAdmin, isLoaded, user, isSignedIn } = useAuth();
+  const [activeTab, setActiveTab] = useState<
+    "events" | "activities" | "pookalam" | "creators" | "announcements" | "users" | "logs"
+  >("events");
 
-interface CreatorApp {
-  id: string;
-  name: string;
-  channel: string;
-  platform: string;
-  followers: number;
-  country: string;
-  status: "pending" | "approved" | "rejected";
-  time: string;
-}
+  const [selectedEventId, setSelectedEventId] = useState<Id<"events"> | null>(null);
 
-export default function AdminDashboardPage() {
-  const { user, isAdmin, isSuperAdmin, switchDemoRole } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  // Queries
+  const events = useQuery(api.events.listEvents, { status: "all" });
+  const currentEventId = selectedEventId ?? events?.[0]?._id ?? null;
 
-  // Admin states
-  const [eventsList, setEventsList] = useState(INITIAL_EVENTS);
-  const [creatorApps, setCreatorApps] = useState<CreatorApp[]>([
-    {
-      id: "app_1",
-      name: "Suresh Menon",
-      channel: "Suresh Gaming Kerala",
-      platform: "youtube",
-      followers: 85000,
-      country: "IN",
-      status: "pending",
-      time: "15m ago",
-    },
-    {
-      id: "app_2",
-      name: "Sneha Nair",
-      channel: "Sneha Digital Art",
-      platform: "instagram",
-      followers: 120000,
-      country: "IN",
-      status: "pending",
-      time: "2h ago",
-    },
-  ]);
+  const controlData = useQuery(
+    api.controlCenter.eventControl,
+    isAdmin && currentEventId ? { eventId: currentEventId } : "skip"
+  );
+  const platformAnalytics = useQuery(api.admin.getPlatformAnalytics, isAdmin ? {} : "skip");
+  const creatorApplications = useQuery(api.creators.listApplicationsForAdmin, isAdmin ? { status: "all" } : "skip");
+  const announcements = useQuery(api.announcements.listGlobalAnnouncements);
+  const allUsers = useQuery(api.admin.listUsers, isAdmin ? {} : "skip");
+  const auditLogs = useQuery(api.admin.listAuditLogs, isAdmin ? { limit: 50 } : "skip");
 
-  const [auditLogs, setAuditLogs] = useState([
-    { id: "log_1", action: "EVENT_PUBLISHED", entity: "events", target: "ONAM 2026", time: "1 hour ago", admin: "D-One Super Admin" },
-    { id: "log_2", action: "CREATOR_APPROVED", entity: "creatorApplications", target: "Rahul Playz", time: "3 hours ago", admin: "D-One Super Admin" },
-    { id: "log_3", action: "POOKALAM_WINNER_SELECTED", entity: "pookalamSubmissions", target: "Golden Athapookalam", time: "1 day ago", admin: "D-One Super Admin" },
-  ]);
+  // Mutations
+  const setEventStateMutation = useMutation(api.controlCenter.setEventState);
+  const setDefaultEventMutation = useMutation(api.events.setDefaultEvent);
+  const setActivityStateMutation = useMutation(api.controlCenter.setActivityState);
+  const startQuizMutation = useMutation(api.controlCenter.startQuiz);
+  const setPookalamModeMutation = useMutation(api.controlCenter.setPookalamMode);
+  const awardWinnerBadgeMutation = useMutation(api.pookalam.awardWinnerBadge);
+  const approveCreatorMutation = useMutation(api.creators.approveApplication);
+  const rejectCreatorMutation = useMutation(api.creators.rejectApplication);
+  const publishAnnouncementMutation = useMutation(api.announcements.publishAnnouncement);
+  const deleteAnnouncementMutation = useMutation(api.announcements.deleteAnnouncement);
+  const updateUserRoleMutation = useMutation(api.admin.updateUserRole);
+  const toggleSuspensionMutation = useMutation(api.admin.toggleSuspension);
+  const terminateMatchMutation = useMutation(api.matches.terminateMatch);
+  const bootstrapSuperAdminMutation = useMutation(api.admin.bootstrapSuperAdmin);
 
-  // Event builder modal state
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [newEventTitle, setNewEventTitle] = useState("");
-  const [newEventSlug, setNewEventSlug] = useState("");
-  const [newEventCategory, setNewEventCategory] = useState<any>("festival");
+  // Form States for Announcement
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: "",
+    content: "",
+    type: "info" as "urgent" | "info" | "tournament" | "winner",
+    isGlobal: true,
+  });
 
-  // Announcements state
-  const [announcementText, setAnnouncementText] = useState("");
-  const [broadcastList, setBroadcastList] = useState([
-    { id: "b_1", text: "🎉 ONAM 2026 is LIVE! Compete in Vadamvali & Pookalam for ₹100k+ in prizes.", time: "Active" },
-    { id: "b_2", text: "🪢 Vadamvali Quick Match Arena is open for 1v1 multiplayer battles.", time: "Active" },
-  ]);
+  const [announcementMsg, setAnnouncementMsg] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState("");
+  const [bootstrapKey, setBootstrapKey] = useState("");
+  const [bootstrapEmail, setBootstrapEmail] = useState("");
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [bootstrapSuccess, setBootstrapSuccess] = useState<string | null>(null);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
 
-  // If user is not admin, provide convenient 1-click bootstrap button for reviewer
+  if (!isLoaded) {
+    return <div className="min-h-screen p-12 text-center text-white">Loading admin session…</div>;
+  }
+
   if (!isAdmin) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-8 space-y-4 max-w-md mx-auto">
-        <ShieldAlert className="w-16 h-16 text-rose-400 animate-pulse" />
-        <h1 className="text-2xl font-black text-white">Admin Privileges Required</h1>
-        <p className="text-xs text-slate-400">
-          This area is protected by Clerk authentication and Convex role-based access control. Switch to Admin or Super Admin mode to access the dashboard.
-        </p>
-        <button
-          onClick={() => {
-            soundFx.playVictory();
-            switchDemoRole("super_admin");
-          }}
-          className="px-6 py-3 rounded-2xl font-black text-xs bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:brightness-110 shadow-lg shadow-emerald-500/20"
-        >
-          Elevate to Super Admin (Demo Mode)
-        </button>
+      <div className="min-h-screen py-16 px-4 max-w-2xl mx-auto text-center space-y-6">
+        <div className="w-16 h-16 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto text-3xl shadow-lg shadow-rose-500/10">
+          <Lock className="w-8 h-8" />
+        </div>
+        
+        <div className="space-y-2">
+          <h1 className="text-3xl font-black text-white tracking-tight">
+            {!isSignedIn ? "Sign In Required" : "Admin Privileges Required"}
+          </h1>
+          <p className="text-sm text-slate-400 max-w-md mx-auto">
+            {!isSignedIn
+              ? "Please sign in with your administrative account to access the event management control center."
+              : `You are signed in as ${user?.email || user?.username || "User"}, but your account is not assigned the admin or super_admin role.`}
+          </p>
+        </div>
+
+        {!isSignedIn && (
+          <div className="pt-2">
+            <Link
+              href="/sign-in"
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:brightness-110 shadow-lg shadow-emerald-500/25 transition-all"
+            >
+              Sign In to Continue
+            </Link>
+          </div>
+        )}
+
+        <div className="pt-6 border-t border-slate-800/80 max-w-sm mx-auto space-y-3">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Bootstrap Admin Access
+          </div>
+
+          <input
+            type="email"
+            placeholder="Account Email (e.g. fairozfaisal2001@gmail.com)"
+            value={bootstrapEmail}
+            onChange={(e) => setBootstrapEmail(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white text-center"
+          />
+
+          <div className="relative">
+            <input
+              type="password"
+              placeholder="Bootstrap Secret Key"
+              value={bootstrapKey}
+              onChange={(e) => setBootstrapKey(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white text-center"
+            />
+          </div>
+
+          <div className="flex justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setBootstrapKey("done-studio-super-admin-2026");
+                if (!bootstrapEmail) setBootstrapEmail("fairozfaisal2001@gmail.com");
+              }}
+              className="text-[11px] text-amber-400/90 hover:text-amber-300 underline underline-offset-4 cursor-pointer block transition-colors"
+            >
+              Fill Default Credentials (<code>done-studio-super-admin-2026</code>)
+            </button>
+          </div>
+
+          {bootstrapError && (
+            <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 text-left">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{bootstrapError}</span>
+            </div>
+          )}
+
+          {bootstrapSuccess && (
+            <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 text-left">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>{bootstrapSuccess}</span>
+            </div>
+          )}
+
+          <button
+            disabled={isBootstrapping || !bootstrapKey}
+            onClick={async () => {
+              try {
+                soundFx.playClick();
+                setIsBootstrapping(true);
+                setBootstrapError(null);
+                setBootstrapSuccess(null);
+                const res = await bootstrapSuperAdminMutation({
+                  secretKey: bootstrapKey,
+                  email: bootstrapEmail.trim() || user?.email || "fairozfaisal2001@gmail.com",
+                });
+                setBootstrapSuccess(res.message || "Admin privileges granted! Reloading...");
+                setTimeout(() => window.location.reload(), 1000);
+              } catch (err: any) {
+                setBootstrapError(err.message || "Failed to bootstrap admin");
+              } finally {
+                setIsBootstrapping(false);
+              }
+            }}
+            className="w-full px-6 py-3 rounded-xl font-bold text-xs bg-amber-500 text-slate-950 hover:brightness-110 shadow-lg shadow-amber-500/20 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {isBootstrapping ? "Claiming..." : "Claim Admin Status"}
+          </button>
+        </div>
       </div>
     );
   }
 
-  // 1-Click Approve Creator
-  const handleApproveCreator = (id: string) => {
-    soundFx.playVictory();
-    const app = creatorApps.find((a) => a.id === id);
-    if (!app) return;
-
-    setCreatorApps((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "approved" } : a))
-    );
-
-    setAuditLogs((prev) => [
-      {
-        id: `log_${Date.now()}`,
-        action: "CREATOR_APPROVED",
-        entity: "creatorApplications",
-        target: app.channel,
-        time: "Just now",
-        admin: user?.displayName || "Admin",
-      },
-      ...prev,
-    ]);
-
-    confetti({
-      particleCount: 80,
-      spread: 60,
-      origin: { y: 0.6 },
-    });
-  };
-
-  // 1-Click Reject Creator
-  const handleRejectCreator = (id: string) => {
-    soundFx.playClick();
-    setCreatorApps((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "rejected" } : a))
-    );
-  };
-
-  // Create New Event
-  const handleCreateEvent = (e: React.FormEvent) => {
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEventTitle.trim()) return;
-    soundFx.playVictory();
-
-    const cleanSlug =
-      newEventSlug || newEventTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-    const created: any = {
-      _id: `evt_${Date.now()}`,
-      title: newEventTitle,
-      slug: cleanSlug,
-      tagline: "Official D-One Studio Championship",
-      description: "A newly created festival tournament arena configured from the Admin Event Builder.",
-      bannerUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1600&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=600&q=80",
-      startDate: "2026-11-01T00:00:00Z",
-      endDate: "2026-11-10T23:59:59Z",
-      registrationStartDate: "2026-10-15T00:00:00Z",
-      registrationEndDate: "2026-10-31T23:59:59Z",
-      status: "scheduled",
-      category: newEventCategory,
-      theme: {
-        primaryColor: "#064e3b",
-        secondaryColor: "#f59e0b",
-        accentColor: "#ea580c",
-        bgGradient: "from-slate-950 via-slate-900 to-amber-950",
-        bannerBadge: "NEW EVENT",
-        festivalIcon: "🏆",
-      },
-      featured: false,
-      rules: ["Standard D-One Studio fair play guidelines apply."],
-      prizes: [{ place: "1st Place", title: "Trophy + ₹25,000", reward: "₹25,000", icon: "🏆" }],
-      sponsors: [{ name: "D-One Studio", logoUrl: "", tier: "Title" }],
-      organizer: "D-One Studio Events",
-      participantCount: 0,
-    };
-
-    setEventsList((prev) => [created, ...prev]);
-    setShowEventModal(false);
-    setNewEventTitle("");
-    setNewEventSlug("");
-
-    setAuditLogs((prev) => [
-      {
-        id: `log_${Date.now()}`,
-        action: "EVENT_CREATED",
-        entity: "events",
-        target: created.title,
-        time: "Just now",
-        admin: user?.displayName || "Admin",
-      },
-      ...prev,
-    ]);
-  };
-
-  // Broadcast Announcement
-  const handleBroadcast = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!announcementText.trim()) return;
+    if (!newAnnouncement.title || !newAnnouncement.content) return;
     soundFx.playClick();
-
-    setBroadcastList((prev) => [
-      { id: `b_${Date.now()}`, text: announcementText, time: "Just now" },
-      ...prev,
-    ]);
-    setAnnouncementText("");
+    try {
+      await publishAnnouncementMutation({
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
+        type: newAnnouncement.type,
+        isGlobal: newAnnouncement.isGlobal,
+      });
+      setNewAnnouncement({
+        title: "",
+        content: "",
+        type: "info",
+        isGlobal: true,
+      });
+      setAnnouncementMsg("Announcement broadcasted live!");
+      setTimeout(() => setAnnouncementMsg(null), 3000);
+    } catch (err: any) {
+      alert(err.message || "Failed to create announcement");
+    }
   };
 
-  const navItems = [
-    { id: "overview", label: "Analytics Overview", icon: LayoutDashboard },
-    { id: "events", label: "Event Builder & Mgr", icon: Calendar, badge: eventsList.length },
-    { id: "creators", label: "Creator Requests", icon: Users, badge: creatorApps.filter((a) => a.status === "pending").length, highlight: true },
-    { id: "users", label: "User Management", icon: ShieldCheck },
-    { id: "vadamvali", label: "Vadamvali Matches", icon: Flame },
-    { id: "pookalams", label: "Pookalam Entries", icon: Sparkles },
-    { id: "quizzes", label: "Quiz Question Bank", icon: HelpCircle },
-    { id: "announcements", label: "Broadcast Alerts", icon: Megaphone },
-    { id: "audit", label: "Audit Logs", icon: History },
-  ];
+  const usersList = allUsers ?? [];
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
-      {/* Top Admin Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-3xl glass-panel-gold border border-emerald-500/40">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-7 h-7" />
+    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 text-white">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase">
+            <ShieldCheck className="w-3.5 h-3.5" /> D-One Platform Control Center
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-white">
-                D-One Studio Admin Suite
-              </h1>
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
-                {user?.role?.toUpperCase()}
-              </span>
-            </div>
-            <p className="text-xs text-slate-300">
-              Authenticated identity: <strong>{user?.displayName}</strong> ({user?.email})
-            </p>
-          </div>
+          <h1 className="text-3xl sm:text-4xl font-black">Admin Management Suite</h1>
+          <p className="text-xs text-slate-400">
+            Real-time control over events, multiplayer games, creator guild, public gallery, users, and broadcasts.
+          </p>
         </div>
 
+        {/* Event Selector */}
         <div className="flex items-center gap-3">
-          <Link
-            href="/events/onam-2026"
-            onClick={() => soundFx.playClick()}
-            className="px-4 py-2 rounded-xl text-xs font-bold glass-panel border border-slate-700 text-slate-200 hover:text-white flex items-center gap-1"
+          <select
+            className="px-4 py-2.5 rounded-xl glass-input text-xs font-bold text-slate-200 bg-slate-900 border border-slate-700"
+            value={currentEventId ?? ""}
+            onChange={(e) => setSelectedEventId(e.target.value as Id<"events">)}
           >
-            Live Onam Arena <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
+            {events?.map((e) => (
+              <option key={e._id} value={e._id}>
+                {e.title} ({e.status.toUpperCase()})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Main Admin Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Admin Navigation Sidebar (3 Cols) */}
-        <div className="lg:col-span-3 space-y-2 glass-panel p-3 rounded-2xl border border-slate-800">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  soundFx.playClick();
-                  setActiveTab(item.id as AdminTab);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                  isActive
-                    ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
-                    : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </div>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                      item.highlight
-                        ? "bg-rose-500 text-white animate-pulse"
-                        : "bg-slate-800 text-slate-300"
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+      {/* Analytics Overview Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Total Players</span>
+            <Users className="w-3.5 h-3.5 text-amber-400" />
+          </div>
+          <div className="text-2xl font-black text-white">
+            {platformAnalytics?.totalUsers?.toLocaleString() ?? 0}
+          </div>
         </div>
 
-        {/* Right Content Area (9 Cols) */}
-        <div className="lg:col-span-9 space-y-6">
-          {/* 1. OVERVIEW TAB */}
-          {activeTab === "overview" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400 font-semibold">Total Registered Users</div>
-                  <div className="text-2xl font-black text-white">14,820</div>
-                  <div className="text-[10px] text-emerald-400 font-bold">+342 today</div>
-                </div>
+        <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Live / Completed Matches</span>
+            <Flame className="w-3.5 h-3.5 text-orange-400" />
+          </div>
+          <div className="text-2xl font-black text-orange-400">
+            {platformAnalytics?.liveMatches ?? 0} <span className="text-xs text-slate-400">Live</span> / {platformAnalytics?.completedMatches ?? 0} <span className="text-xs text-slate-400">Done</span>
+          </div>
+        </div>
 
-                <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400 font-semibold">Active Events</div>
-                  <div className="text-2xl font-black text-amber-400">{eventsList.length}</div>
-                  <div className="text-[10px] text-slate-400">Flagship: Onam 2026</div>
-                </div>
+        <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Pookalam Artworks</span>
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className="text-2xl font-black text-emerald-400">
+            {platformAnalytics?.pookalamSubmissions?.toLocaleString() ?? 0}
+          </div>
+        </div>
 
-                <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400 font-semibold">Pending Creator Requests</div>
-                  <div className="text-2xl font-black text-rose-400">
-                    {creatorApps.filter((a) => a.status === "pending").length}
-                  </div>
-                  <div className="text-[10px] text-rose-300">Requires review</div>
-                </div>
+        <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Total Platform XP</span>
+            <Trophy className="w-3.5 h-3.5 text-yellow-400" />
+          </div>
+          <div className="text-2xl font-black text-yellow-400">
+            {platformAnalytics?.totalPointsAwarded?.toLocaleString() ?? 0}
+          </div>
+        </div>
+      </div>
 
-                <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400 font-semibold">Vadamvali Matches</div>
-                  <div className="text-2xl font-black text-orange-400">9,240</div>
-                  <div className="text-[10px] text-slate-400">Anti-cheat active</div>
-                </div>
+      {/* Tabs Navigation */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-4">
+        {[
+          { id: "events", label: "🎪 Event Lifecycle", icon: Calendar },
+          { id: "activities", label: "🪢 Matches & Activities", icon: Flame },
+          { id: "pookalam", label: "🌸 Pookalam Submissions", icon: Sparkles },
+          { id: "creators", label: "👥 Creators Guild", icon: Crown },
+          { id: "announcements", label: "📢 Announcements", icon: Bell },
+          { id: "users", label: "🛡️ Users & Roles", icon: Users },
+          { id: "logs", label: "📜 Audit Logs", icon: FileText },
+        ].map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                soundFx.playClick();
+                setActiveTab(tab.id as any);
+              }}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                isActive
+                  ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+                  : "glass-panel text-slate-300 hover:text-white hover:bg-slate-800"
+              }`}
+            >
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-                <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400 font-semibold">Pookalam Submissions</div>
-                  <div className="text-2xl font-black text-emerald-400">4,320</div>
-                  <div className="text-[10px] text-slate-400">1,920+ Votes cast</div>
-                </div>
-
-                <div className="p-5 rounded-2xl glass-panel border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400 font-semibold">Platform XP Distributed</div>
-                  <div className="text-2xl font-black text-yellow-400">1.25M+</div>
-                  <div className="text-[10px] text-slate-400">Across 27 Leaderboards</div>
-                </div>
-              </div>
-
-              {/* Quick Actions Panel */}
-              <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Quick Administration Actions
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={() => {
-                      soundFx.playClick();
-                      setShowEventModal(true);
-                    }}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:brightness-110 flex items-center gap-1.5 shadow-md"
-                  >
-                    <Plus className="w-4 h-4" /> Create New Event
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      soundFx.playClick();
-                      setActiveTab("creators");
-                    }}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold glass-panel border border-slate-700 text-slate-200 hover:bg-slate-800 flex items-center gap-1.5"
-                  >
-                    <Users className="w-4 h-4 text-sky-400" /> Review Creator Requests (
-                    {creatorApps.filter((a) => a.status === "pending").length})
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      soundFx.playClick();
-                      setActiveTab("announcements");
-                    }}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold glass-panel border border-slate-700 text-slate-200 hover:bg-slate-800 flex items-center gap-1.5"
-                  >
-                    <Megaphone className="w-4 h-4 text-amber-400" /> Broadcast Alert
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 2. EVENTS TAB */}
-          {activeTab === "events" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-white">Event Builder & Manager</h2>
-                  <p className="text-xs text-slate-400">
-                    Add new festivals, gaming tournaments, and creator competitions.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowEventModal(true)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:brightness-110 flex items-center gap-1.5 shadow-md"
-                >
-                  <Plus className="w-4 h-4" /> Build New Event
-                </button>
-              </div>
-
-              <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800 divide-y divide-slate-800">
-                {eventsList.map((evt) => (
-                  <div
-                    key={evt._id}
-                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-800/40"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <img
-                        src={evt.thumbnailUrl}
-                        alt={evt.title}
-                        className="w-12 h-12 rounded-xl object-cover border border-slate-700 shrink-0"
-                      />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-white text-sm">{evt.title}</h4>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                            {evt.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 truncate max-w-sm">{evt.tagline}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 self-end sm:self-auto">
-                      <Link
-                        href={`/events/${evt.slug}`}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1"
-                      >
-                        Public Route <ExternalLink className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 3. CREATOR REQUESTS TAB (With instant 1-click Approve) */}
-          {activeTab === "creators" && (
-            <div className="space-y-6">
+      {/* TAB 1: Event Lifecycle & Default Event */}
+      {activeTab === "events" && controlData && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-white">Creator & Streamer Applications</h2>
-                <p className="text-xs text-slate-400">
-                  Review applicant channels, follower metrics, and grant instant verified creator status.
+                <h3 className="text-xl font-black text-white">{controlData.event.title}</h3>
+                <p className="text-xs text-amber-400 font-bold uppercase mt-0.5">
+                  Current Status: {controlData.event.status} · {controlData.registrations.length} Registered Players
                 </p>
               </div>
 
-              <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800 divide-y divide-slate-800">
-                {creatorApps.map((app) => (
-                  <div
-                    key={app.id}
-                    className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              <button
+                onClick={async () => {
+                  soundFx.playClick();
+                  await setDefaultEventMutation({ eventId: controlData.event._id });
+                  alert(`Set "${controlData.event.title}" as platform default flagship event!`);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-black bg-emerald-500 text-slate-950 hover:bg-emerald-400 flex items-center gap-1.5 self-start"
+              >
+                <Crown className="w-3.5 h-3.5" />
+                <span>Set as Platform Flagship Event</span>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <span className="text-xs font-bold text-slate-400">Trigger Event State Transition:</span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "Registration Open", state: "registration_open", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+                  { label: "Registration Closed", state: "registration_closed", color: "bg-slate-800 text-slate-300 border-slate-700" },
+                  { label: "Ready (Pre-Launch)", state: "ready", color: "bg-sky-500/20 text-sky-300 border-sky-500/30" },
+                  { label: "Go LIVE Now", state: "live", color: "bg-emerald-500 text-slate-950 font-black" },
+                  { label: "Pause Event", state: "paused", color: "bg-orange-500/20 text-orange-300 border-orange-500/30" },
+                  { label: "Complete Event", state: "completed", color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
+                  { label: "Cancel Event", state: "cancelled", color: "bg-rose-500/20 text-rose-300 border-rose-500/30" },
+                ].map((btn) => (
+                  <button
+                    key={btn.state}
+                    onClick={async () => {
+                      soundFx.playClick();
+                      await setEventStateMutation({
+                        eventId: controlData.event._id,
+                        state: btn.state as any,
+                      });
+                    }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all hover:scale-105 ${btn.color}`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-white text-sm">{app.name}</h4>
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-sky-500/20 text-sky-400">
-                          {app.platform}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                            app.status === "approved"
-                              ? "bg-emerald-500/20 text-emerald-300"
-                              : app.status === "rejected"
-                              ? "bg-rose-500/20 text-rose-300"
-                              : "bg-amber-500/20 text-amber-300"
-                          }`}
-                        >
-                          {app.status}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300">
-                        Channel: <strong>{app.channel}</strong> •{" "}
-                        <strong className="text-amber-400">
-                          {(app.followers / 1000).toFixed(0)}k+
-                        </strong>{" "}
-                        Followers
-                      </p>
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Registered Participants */}
+          <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-base font-black text-white">Registered Participants ({controlData.registrations.length})</h3>
+            <div className="divide-y divide-slate-800 max-h-72 overflow-y-auto">
+              {controlData.participants.map((p) => (
+                <div key={p._id} className="py-2.5 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={p.profile?.avatarUrl || "https://api.dicebear.com/7.x/bottts/svg?seed=user"}
+                      alt="Player"
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                    <div>
+                      <strong className="text-white">{p.profile?.displayName || p.clerkUserId}</strong>
+                      <span className="text-slate-400 ml-2">@{p.profile?.username}</span>
+                    </div>
+                  </div>
+                  <span className="text-slate-500">
+                    {new Date(p.registeredAt).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: Activities & Matches */}
+      {activeTab === "activities" && controlData && (
+        <div className="space-y-6">
+          {/* Activities Controller */}
+          <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-lg font-black text-white">Activity Status Controller</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {controlData.activities.map((act) => (
+                <div key={act._id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <strong className="text-white text-sm">{act.title}</strong>
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">
+                      {act.status}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {["registration_open", "live", "paused", "completed"].map((st) => (
+                      <button
+                        key={st}
+                        onClick={async () => {
+                          soundFx.playClick();
+                          await setActivityStateMutation({
+                            activityId: act._id,
+                            state: st as any,
+                          });
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+                      >
+                        {st.replace("_", " ")}
+                      </button>
+                    ))}
+                  </div>
+
+                  {act.type === "quiz" && controlData.quizzes[0] && (
+                    <button
+                      onClick={async () => {
+                        soundFx.playClick();
+                        await startQuizMutation({ quizId: controlData.quizzes[0]._id });
+                        alert("Cultural quiz launched live!");
+                      }}
+                      className="w-full py-2 rounded-xl text-xs font-black bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                    >
+                      🚀 Launch Live Quiz Session
+                    </button>
+                  )}
+
+                  {act.type === "pookalam" && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          soundFx.playClick();
+                          await setPookalamModeMutation({
+                            activityId: act._id,
+                            submissionsOpen: true,
+                            votingStatus: "open",
+                          });
+                        }}
+                        className="flex-1 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-600/30 text-emerald-300 border border-emerald-500/40"
+                      >
+                        Open Submissions & Voting
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Live Matches Terminal */}
+          <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-lg font-black text-white">Live Vadamvali Matches Monitor ({controlData.matches.length})</h3>
+            {controlData.matches.length === 0 ? (
+              <p className="text-xs text-slate-500 py-4 text-center">No active or pending matches currently.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {controlData.matches.map((m) => (
+                  <div key={m._id} className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-amber-400">{m.roomCode}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-slate-300">
+                        {m.status}
+                      </span>
                     </div>
 
-                    {app.status === "pending" ? (
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <button
-                          onClick={() => handleApproveCreator(app.id)}
-                          className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 shadow-md"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                        </button>
-                        <button
-                          onClick={() => handleRejectCreator(app.id)}
-                          className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 flex items-center gap-1"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Reject
-                        </button>
+                    <div className="text-slate-200">
+                      <strong>{m.player1.displayName}</strong> vs <strong>{m.player2?.displayName || "Waiting..."}</strong>
+                    </div>
+
+                    <div className="text-slate-400 text-[11px]">
+                      Rope Position: {Math.round(m.ropePosition)}% · Pulls: {m.player1.pulls} vs {m.player2?.pulls || 0}
+                    </div>
+
+                    {m.status === "in_progress" && (
+                      <button
+                        onClick={async () => {
+                          soundFx.playClick();
+                          await terminateMatchMutation({ matchId: m._id, reason: "Terminated by admin" });
+                        }}
+                        className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/30"
+                      >
+                        Force Terminate Match
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: Pookalam Submissions Review */}
+      {activeTab === "pookalam" && controlData && (
+        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-black text-white">Community Pookalam Submissions</h3>
+              <p className="text-xs text-slate-400">Review submitted digital floral artworks and award official winner badges.</p>
+            </div>
+            <Link
+              href="/events/onam-2026/pookalam/gallery"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+            >
+              Open Public Gallery →
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {controlData.pookalams.map((p) => (
+              <div key={p._id} className="rounded-2xl bg-slate-900/90 border border-slate-800 overflow-hidden space-y-3 p-3">
+                <img
+                  src={p.previewUrl}
+                  alt={p.title}
+                  className="w-full aspect-square object-cover rounded-xl bg-slate-950"
+                />
+                <div>
+                  <h4 className="font-bold text-white text-sm truncate">{p.title}</h4>
+                  <p className="text-xs text-slate-400">By {p.creatorName} · {p.voteCount} votes</p>
+                  {p.winnerBadge && (
+                    <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500 text-slate-950 uppercase">
+                      👑 {p.winnerBadge.replace("_", " ")}
+                    </span>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex flex-wrap gap-1">
+                  {["gold_winner", "silver_winner", "bronze_winner", "peoples_choice"].map((badge) => (
+                    <button
+                      key={badge}
+                      onClick={async () => {
+                        soundFx.playVictory();
+                        await awardWinnerBadgeMutation({
+                          submissionId: p._id,
+                          badge: badge as any,
+                        });
+                        alert(`Awarded ${badge} to "${p.title}"!`);
+                      }}
+                      className="px-2 py-1 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/40"
+                    >
+                      {badge.split("_")[0].toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: Creators Guild */}
+      {activeTab === "creators" && (
+        <div className="space-y-6">
+          {/* Pending Applications */}
+          <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-lg font-black text-white">Pending Creator Applications</h3>
+            {!creatorApplications || creatorApplications.length === 0 ? (
+              <p className="text-xs text-slate-500 py-4 text-center">No pending creator applications.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {creatorApplications.map((app: any) => (
+                  <div key={app._id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <strong className="text-white text-sm">{app.name}</strong>
+                        <p className="text-slate-400">@{app.username} · {app.platform.toUpperCase()}</p>
                       </div>
-                    ) : (
-                      <div className="text-xs font-semibold text-slate-400">
-                        Status: <span className="capitalize text-white font-bold">{app.status}</span>
+                      <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300">
+                        {app.status}
+                      </span>
+                    </div>
+
+                    <div className="text-slate-300 leading-relaxed">
+                      <strong>Channel:</strong> {app.channelName} ({app.followerCount?.toLocaleString()} followers)
+                      <br />
+                      <strong>Bio:</strong> {app.description}
+                    </div>
+
+                    {app.status === "pending" && (
+                      <div className="flex gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          onClick={async () => {
+                            soundFx.playVictory();
+                            await approveCreatorMutation({
+                              applicationId: app._id,
+                            });
+                          }}
+                          className="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                        >
+                          ✓ Approve & Verify
+                        </button>
+                        <button
+                          onClick={async () => {
+                            soundFx.playClick();
+                            await rejectCreatorMutation({
+                              applicationId: app._id,
+                              reason: "Requirements not met",
+                            });
+                          }}
+                          className="flex-1 py-2 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/30"
+                        >
+                          ✕ Reject
+                        </button>
                       </div>
                     )}
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* 4. USER MANAGEMENT TAB */}
-          {activeTab === "users" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">User & Role Management</h2>
-                <p className="text-xs text-slate-400">
-                  Search members, elevate permissions, suspend accounts, and reset event points.
-                </p>
-              </div>
-
-              <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800 divide-y divide-slate-800">
-                {INITIAL_LEADERBOARD.map((usr) => (
-                  <div
-                    key={usr.username}
-                    className="p-4 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={usr.avatarUrl}
-                        alt={usr.displayName}
-                        className="w-10 h-10 rounded-xl object-cover border border-slate-700"
-                      />
-                      <div>
-                        <h4 className="text-xs font-bold text-white">{usr.displayName}</h4>
-                        <p className="text-[11px] text-slate-400">@{usr.username}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-amber-400">
-                        {usr.points} XP
-                      </span>
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                        {usr.role}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 5. VADAMVALI MATCHES TAB */}
-          {activeTab === "vadamvali" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Live Vadamvali Match Control</h2>
-                <p className="text-xs text-slate-400">
-                  Monitor live 1v1 sessions, inspect click frequency logs, and terminate problematic matches.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-3">
-                  <span className="font-bold text-white">Match #D1-48291 (Live Now)</span>
-                  <span className="text-emerald-400 font-bold">● Active 1v1</span>
-                </div>
-                <div className="text-xs text-slate-300">
-                  Player 1: <strong>Maveli Warrior (54%)</strong> vs Player 2: <strong>Thrissur Tiger (46%)</strong>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900">
-                    Terminate Match
-                  </button>
-                  <span className="text-[11px] text-slate-500">Anti-cheat: All pull frequencies verified (&lt; 20/s)</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 6. POOKALAM ENTRIES TAB */}
-          {activeTab === "pookalams" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Pookalam Submissions Review</h2>
-                <p className="text-xs text-slate-400">
-                  Award 1st Place, 2nd Place, 3rd Place, and People's Choice badges.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {INITIAL_POOKALAMS.map((pk) => (
-                  <div
-                    key={pk._id}
-                    className="p-4 rounded-2xl glass-panel border border-slate-800 flex items-center gap-3"
-                  >
-                    <img
-                      src={pk.previewUrl}
-                      alt={pk.title}
-                      className="w-16 h-16 rounded-xl object-cover"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-xs font-bold text-white truncate">{pk.title}</h4>
-                      <p className="text-[11px] text-slate-400">by {pk.creatorName}</p>
-                      <div className="text-xs font-bold text-pink-400 mt-1">
-                        {pk.voteCount} Votes
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 7. QUIZZES TAB */}
-          {activeTab === "quizzes" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Quiz Question Bank</h2>
-                <p className="text-xs text-slate-400">
-                  Manage Onam & festival questions, answer keys, and difficulty points.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-2">
-                <div className="text-sm font-bold text-white">Grand Onam Trivia Championship 2026</div>
-                <div className="text-xs text-slate-400">10 Questions Active • 15s Timer • Protected Answer Server</div>
-              </div>
-            </div>
-          )}
-
-          {/* 8. ANNOUNCEMENTS TAB */}
-          {activeTab === "announcements" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Broadcast Announcements</h2>
-                <p className="text-xs text-slate-400">
-                  Publish global banners across homepage, event hubs, and dashboards.
-                </p>
-              </div>
-
-              <form onSubmit={handleBroadcast} className="glass-panel p-5 rounded-2xl space-y-3 border border-slate-800">
-                <label className="text-xs font-bold text-slate-300">New Broadcast Alert</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 🪢 Vadamvali Finals Start Tonight at 8 PM!"
-                  value={announcementText}
-                  onChange={(e) => setAnnouncementText(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
-                />
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:brightness-110 shadow-md"
-                >
-                  Publish Broadcast Alert
-                </button>
-              </form>
-
-              <div className="space-y-2">
-                {broadcastList.map((b) => (
-                  <div
-                    key={b.id}
-                    className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs flex items-center justify-between text-slate-300"
-                  >
-                    <span>{b.text}</span>
-                    <span className="text-[10px] font-bold text-emerald-400">{b.time}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 9. AUDIT LOGS TAB */}
-          {activeTab === "audit" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Immutable Admin Audit Logs</h2>
-                <p className="text-xs text-slate-400">
-                  Append-only record of all administrative operations and mutations.
-                </p>
-              </div>
-
-              <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800 divide-y divide-slate-800">
-                {auditLogs.map((log) => (
-                  <div key={log.id} className="p-4 text-xs flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-amber-400">{log.action}</span>
-                        <span className="text-slate-400">• {log.target}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500">Performed by {log.admin}</p>
-                    </div>
-                    <span className="text-[10px] text-slate-400">{log.time}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Event Builder Modal */}
-      {showEventModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in">
-          <div className="max-w-lg w-full glass-panel-gold rounded-3xl p-6 sm:p-8 border border-amber-500/30 space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-amber-400" /> Event Builder
-              </h3>
-              <button
-                onClick={() => setShowEventModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
+      {/* TAB 5: Announcements Broadcaster */}
+      {activeTab === "announcements" && (
+        <div className="space-y-6">
+          <form onSubmit={handleCreateAnnouncement} className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-lg font-black text-white">Broadcast Global Platform Announcement</h3>
 
-            <form onSubmit={handleCreateEvent} className="space-y-4 text-xs">
+            {announcementMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 text-xs border border-emerald-500/40">
+                {announcementMsg}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Event Title</label>
+                <label className="text-xs text-slate-400">Announcement Title</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Christmas Carnival 2026"
-                  value={newEventTitle}
-                  onChange={(e) => setNewEventTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-white"
+                  value={newAnnouncement.title}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
+                  placeholder="e.g. Grand Finale Vadamvali Tournament Live!"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-slate-300">URL Slug</label>
-                <input
-                  type="text"
-                  placeholder="e.g. christmas-carnival-2026"
-                  value={newEventSlug}
-                  onChange={(e) => setNewEventSlug(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-white"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Category</label>
+                <label className="text-xs text-slate-400">Type</label>
                 <select
-                  value={newEventCategory}
-                  onChange={(e) => setNewEventCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-slate-200 bg-slate-900"
+                  value={newAnnouncement.type}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, type: e.target.value as any })}
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900"
                 >
-                  <option value="festival">Cultural Festival</option>
-                  <option value="gaming">Gaming & Esports</option>
-                  <option value="creator">Creator Showdown</option>
-                  <option value="competition">Community Contest</option>
+                  <option value="info">Info</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="tournament">Tournament</option>
+                  <option value="winner">Winner / Celebration</option>
                 </select>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowEventModal(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl font-bold bg-amber-500 text-slate-950 hover:brightness-110 shadow-md"
-                >
-                  Create & Launch Event
-                </button>
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs text-slate-400">Content / Message</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={newAnnouncement.content}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
+                  placeholder="Broadcast message shown across all players headers..."
+                />
               </div>
-            </form>
+            </div>
+
+            <button
+              type="submit"
+              className="px-6 py-3 rounded-xl font-black text-xs bg-amber-500 text-slate-950 hover:brightness-110 shadow-lg shadow-amber-500/20"
+            >
+              📢 Broadcast Announcement Now
+            </button>
+          </form>
+
+          {/* Active Announcements List */}
+          <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-base font-black text-white">Active Global Announcements</h3>
+            <div className="divide-y divide-slate-800">
+              {announcements?.map((a) => (
+                <div key={a._id} className="py-3 flex items-center justify-between gap-4 text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-white">{a.title}</strong>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                        {a.type}
+                      </span>
+                    </div>
+                    <p className="text-slate-300 mt-1">{a.content}</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      soundFx.playClick();
+                      await deleteAnnouncementMutation({ announcementId: a._id });
+                    }}
+                    className="p-2 rounded-xl text-rose-400 hover:bg-rose-950/40"
+                    title="Delete announcement"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: Users & Role Management */}
+      {activeTab === "users" && (
+        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h3 className="text-lg font-black text-white">User Accounts & Roles</h3>
+            <input
+              type="text"
+              placeholder="Filter users..."
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              className="px-3.5 py-2 rounded-xl glass-input text-xs text-white"
+            />
+          </div>
+
+          <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
+            {usersList
+              ?.filter((u: any) => u.displayName.toLowerCase().includes(userSearch.toLowerCase()) || u.username.toLowerCase().includes(userSearch.toLowerCase()))
+              .map((u: any) => (
+                <div key={u._id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <img src={u.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
+                    <div>
+                      <strong className="text-white">{u.displayName}</strong>
+                      <span className="text-slate-400 ml-2">@{u.username}</span>
+                      <div className="text-[11px] text-amber-400">{u.points} XP · Level {u.level}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={u.role}
+                      onChange={async (e) => {
+                        soundFx.playClick();
+                        await updateUserRoleMutation({
+                          targetClerkUserId: u.clerkUserId,
+                          newRole: e.target.value as any,
+                        });
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg glass-input text-xs text-slate-200 bg-slate-900 border border-slate-700"
+                    >
+                      <option value="user">User</option>
+                      <option value="creator">Creator</option>
+                      <option value="admin">Admin</option>
+                      <option value="super_admin">Super Admin</option>
+                    </select>
+
+                    <button
+                      onClick={async () => {
+                        soundFx.playClick();
+                        await toggleSuspensionMutation({
+                          targetClerkUserId: u.clerkUserId,
+                          suspend: !u.isSuspended,
+                        });
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                        u.isSuspended ? "bg-rose-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {u.isSuspended ? "Suspended" : "Active"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: Audit Logs */}
+      {activeTab === "logs" && (
+        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+          <h3 className="text-lg font-black text-white">System & Security Audit Logs</h3>
+          <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
+            {auditLogs?.map((log) => (
+              <div key={log._id} className="py-2.5 text-xs flex items-center justify-between">
+                <div>
+                  <strong className="text-amber-400">{log.action}</strong>
+                  <span className="text-slate-300 ml-2">on {log.entity}</span>
+                  <p className="text-slate-500 text-[11px]">By Admin: {log.adminDisplayName} ({log.adminClerkUserId})</p>
+                </div>
+                <span className="text-slate-500 text-[11px]">{new Date(log.timestamp).toLocaleString()}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

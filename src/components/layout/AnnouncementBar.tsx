@@ -2,12 +2,29 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Sparkles, X, ChevronRight } from "lucide-react";
+import { Sparkles, X, ChevronRight, AlertCircle, Trophy, Megaphone } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export function AnnouncementBar() {
   const [isVisible, setIsVisible] = useState(true);
+  const announcements = useQuery(api.announcements.listGlobalAnnouncements);
+  const featuredEvent = useQuery(api.events.getFeaturedEvent);
 
   if (!isVisible) return null;
+
+  const currentAnnouncement = announcements && announcements.length > 0 ? announcements[0] : null;
+
+  const title = currentAnnouncement?.title || (featuredEvent ? `${featuredEvent.title} IS ACTIVE!` : "D-ONE STUDIO EVENTS");
+  const content = currentAnnouncement?.content || (featuredEvent?.tagline || "Join Kerala's premier interactive cultural celebrations, games & tournaments.");
+  const linkHref = featuredEvent ? `/events/${featuredEvent.slug}` : "/events";
+
+  const getIcon = () => {
+    if (currentAnnouncement?.type === "urgent") return <AlertCircle className="w-4 h-4 text-rose-300 shrink-0" />;
+    if (currentAnnouncement?.type === "winner") return <Trophy className="w-4 h-4 text-amber-300 shrink-0" />;
+    if (currentAnnouncement?.type === "tournament") return <Megaphone className="w-4 h-4 text-emerald-300 shrink-0" />;
+    return <Sparkles className="w-4 h-4 text-amber-200 shrink-0" />;
+  };
 
   return (
     <div className="relative bg-gradient-to-r from-amber-600 via-emerald-600 to-amber-600 text-white text-xs sm:text-sm font-medium py-2 px-4 shadow-md z-50">
@@ -17,16 +34,16 @@ export function AnnouncementBar() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
           </span>
-          <Sparkles className="w-4 h-4 text-amber-200 shrink-0 hidden sm:inline" />
-          <span className="font-bold text-amber-200">ONAM 2026 IS LIVE!</span>
-          <span className="hidden md:inline text-amber-100">
-            Compete in Vadamvali Tug of War, Pookalam Designer & Cultural Quiz for ₹100,000+ in prizes.
+          <span className="hidden sm:inline">{getIcon()}</span>
+          <span className="font-bold text-amber-200 uppercase">{title}</span>
+          <span className="hidden md:inline text-amber-100 truncate max-w-xl">
+            {content}
           </span>
           <Link
-            href="/events/onam-2026"
-            className="inline-flex items-center gap-1 font-semibold text-white underline underline-offset-2 hover:text-amber-200 transition-colors ml-1"
+            href={linkHref}
+            className="inline-flex items-center gap-1 font-semibold text-white underline underline-offset-2 hover:text-amber-200 transition-colors ml-1 shrink-0"
           >
-            Enter Onam Arena <ChevronRight className="w-3 h-3" />
+            Enter Arena <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
         <button

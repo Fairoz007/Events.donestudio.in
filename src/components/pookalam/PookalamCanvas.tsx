@@ -1,13 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
-  Sparkles,
-  RotateCw,
   Trash2,
   Undo,
-  Redo,
   Save,
   Send,
   Eye,
@@ -15,11 +12,12 @@ import {
   CheckCircle2,
   Layers,
   Palette,
-  Image as ImageIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { soundFx } from "@/lib/sounds";
 import confetti from "canvas-confetti";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 interface FlowerItem {
   id: string;
@@ -59,11 +57,179 @@ const TEMPLATES = [
   { id: "sunburst", name: "Golden Sunburst", description: "Vibrant yellow-orange celebration" },
 ];
 
+function getStarterElements(templateId: string): CanvasElement[] {
+  const center = 250; // canvas 500x500
+
+  if (templateId === "blank") {
+    return [];
+  }
+
+  if (templateId === "traditional") {
+    return [
+      {
+        id: "el_center",
+        flowerType: "lamp",
+        color: "#f59e0b",
+        x: center,
+        y: center,
+        radius: 0,
+        rotation: 0,
+        symmetry: 1,
+        size: 32,
+      },
+      {
+        id: "el_ring1",
+        flowerType: "jasmine",
+        color: "#f8fafc",
+        x: center,
+        y: center,
+        radius: 45,
+        rotation: 0,
+        symmetry: 8,
+        size: 16,
+      },
+      {
+        id: "el_ring2",
+        flowerType: "marigold",
+        color: "#facc15",
+        x: center,
+        y: center,
+        radius: 90,
+        rotation: 22.5,
+        symmetry: 8,
+        size: 22,
+      },
+      {
+        id: "el_ring3",
+        flowerType: "marigold",
+        color: "#ea580c",
+        x: center,
+        y: center,
+        radius: 140,
+        rotation: 0,
+        symmetry: 16,
+        size: 20,
+      },
+      {
+        id: "el_ring4",
+        flowerType: "rose",
+        color: "#e11d48",
+        x: center,
+        y: center,
+        radius: 195,
+        rotation: 22.5,
+        symmetry: 8,
+        size: 28,
+      },
+    ];
+  }
+
+  if (templateId === "mandala") {
+    return [
+      {
+        id: "el_center_lotus",
+        flowerType: "lotus",
+        color: "#ec4899",
+        x: center,
+        y: center,
+        radius: 0,
+        rotation: 0,
+        symmetry: 1,
+        size: 38,
+      },
+      {
+        id: "el_m_1",
+        flowerType: "leaf",
+        color: "#15803d",
+        x: center,
+        y: center,
+        radius: 70,
+        rotation: 0,
+        symmetry: 12,
+        size: 18,
+      },
+      {
+        id: "el_m_2",
+        flowerType: "marigold",
+        color: "#facc15",
+        x: center,
+        y: center,
+        radius: 130,
+        rotation: 15,
+        symmetry: 12,
+        size: 22,
+      },
+      {
+        id: "el_m_3",
+        flowerType: "rose",
+        color: "#e11d48",
+        x: center,
+        y: center,
+        radius: 185,
+        rotation: 0,
+        symmetry: 12,
+        size: 26,
+      },
+    ];
+  }
+
+  if (templateId === "sunburst") {
+    return [
+      {
+        id: "el_s_center",
+        flowerType: "lamp",
+        color: "#f59e0b",
+        x: center,
+        y: center,
+        radius: 0,
+        rotation: 0,
+        symmetry: 1,
+        size: 34,
+      },
+      {
+        id: "el_s_1",
+        flowerType: "marigold",
+        color: "#ea580c",
+        x: center,
+        y: center,
+        radius: 60,
+        rotation: 0,
+        symmetry: 16,
+        size: 16,
+      },
+      {
+        id: "el_s_2",
+        flowerType: "marigold",
+        color: "#facc15",
+        x: center,
+        y: center,
+        radius: 120,
+        rotation: 11.25,
+        symmetry: 16,
+        size: 22,
+      },
+      {
+        id: "el_s_3",
+        flowerType: "leaf",
+        color: "#15803d",
+        x: center,
+        y: center,
+        radius: 180,
+        rotation: 0,
+        symmetry: 8,
+        size: 30,
+      },
+    ];
+  }
+
+  return [];
+}
+
 export function PookalamCanvas() {
-  const { user, isSignedIn, updateUserPoints } = useAuth();
+  const { isSignedIn } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [elements, setElements] = useState<CanvasElement[]>([]);
+  const [elements, setElements] = useState<CanvasElement[]>(() => getStarterElements("traditional"));
   const [history, setHistory] = useState<CanvasElement[][]>([]);
   const [selectedFlower, setSelectedFlower] = useState<FlowerItem>(FLORAL_ASSETS[0]);
   const [currentSymmetry, setCurrentSymmetry] = useState<number>(8); // 8-fold radial symmetry default
@@ -71,11 +237,6 @@ export function PookalamCanvas() {
   const [designTitle, setDesignTitle] = useState<string>("My Onam Pookalam");
   const [isSaved, setIsSaved] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-
-  // Load starter traditional template on mount
-  useEffect(() => {
-    loadTemplate("traditional");
-  }, []);
 
   const saveToHistory = (newElements: CanvasElement[]) => {
     setHistory((prev) => [...prev.slice(-15), elements]);
@@ -98,176 +259,8 @@ export function PookalamCanvas() {
 
   const loadTemplate = (templateId: string) => {
     soundFx.playClick();
-    const center = 250; // canvas 500x500
-
-    if (templateId === "blank") {
-      setElements([]);
-      return;
-    }
-
-    if (templateId === "traditional") {
-      const starter: CanvasElement[] = [];
-      // Ring 1: Center Lamp
-      starter.push({
-        id: "el_center",
-        flowerType: "lamp",
-        color: "#f59e0b",
-        x: center,
-        y: center,
-        radius: 0,
-        rotation: 0,
-        symmetry: 1,
-        size: 32,
-      });
-
-      // Ring 2: White Jasmine 8x
-      starter.push({
-        id: "el_ring1",
-        flowerType: "jasmine",
-        color: "#f8fafc",
-        x: center,
-        y: center,
-        radius: 45,
-        rotation: 0,
-        symmetry: 8,
-        size: 16,
-      });
-
-      // Ring 3: Yellow Marigold 8x
-      starter.push({
-        id: "el_ring2",
-        flowerType: "marigold",
-        color: "#facc15",
-        x: center,
-        y: center,
-        radius: 90,
-        rotation: 22.5,
-        symmetry: 8,
-        size: 22,
-      });
-
-      // Ring 4: Orange Marigold 16x
-      starter.push({
-        id: "el_ring3",
-        flowerType: "marigold",
-        color: "#ea580c",
-        x: center,
-        y: center,
-        radius: 140,
-        rotation: 0,
-        symmetry: 16,
-        size: 20,
-      });
-
-      // Ring 5: Red Rose Outer Petals 8x
-      starter.push({
-        id: "el_ring4",
-        flowerType: "rose",
-        color: "#e11d48",
-        x: center,
-        y: center,
-        radius: 195,
-        rotation: 22.5,
-        symmetry: 8,
-        size: 28,
-      });
-
-      setElements(starter);
-    } else if (templateId === "mandala") {
-      const starter: CanvasElement[] = [];
-      starter.push({
-        id: "el_center_lotus",
-        flowerType: "lotus",
-        color: "#ec4899",
-        x: center,
-        y: center,
-        radius: 0,
-        rotation: 0,
-        symmetry: 1,
-        size: 38,
-      });
-      starter.push({
-        id: "el_m_1",
-        flowerType: "leaf",
-        color: "#15803d",
-        x: center,
-        y: center,
-        radius: 70,
-        rotation: 0,
-        symmetry: 12,
-        size: 18,
-      });
-      starter.push({
-        id: "el_m_2",
-        flowerType: "marigold",
-        color: "#facc15",
-        x: center,
-        y: center,
-        radius: 130,
-        rotation: 15,
-        symmetry: 12,
-        size: 22,
-      });
-      starter.push({
-        id: "el_m_3",
-        flowerType: "rose",
-        color: "#e11d48",
-        x: center,
-        y: center,
-        radius: 185,
-        rotation: 0,
-        symmetry: 12,
-        size: 26,
-      });
-      setElements(starter);
-    } else if (templateId === "sunburst") {
-      const starter: CanvasElement[] = [];
-      starter.push({
-        id: "el_s_center",
-        flowerType: "lamp",
-        color: "#f59e0b",
-        x: center,
-        y: center,
-        radius: 0,
-        rotation: 0,
-        symmetry: 1,
-        size: 34,
-      });
-      starter.push({
-        id: "el_s_1",
-        flowerType: "marigold",
-        color: "#ea580c",
-        x: center,
-        y: center,
-        radius: 60,
-        rotation: 0,
-        symmetry: 16,
-        size: 16,
-      });
-      starter.push({
-        id: "el_s_2",
-        flowerType: "marigold",
-        color: "#facc15",
-        x: center,
-        y: center,
-        radius: 120,
-        rotation: 11.25,
-        symmetry: 16,
-        size: 22,
-      });
-      starter.push({
-        id: "el_s_3",
-        flowerType: "leaf",
-        color: "#15803d",
-        x: center,
-        y: center,
-        radius: 180,
-        rotation: 0,
-        symmetry: 8,
-        size: 30,
-      });
-      setElements(starter);
-    }
+    const newStarter = getStarterElements(templateId);
+    saveToHistory(newStarter);
   };
 
   // Canvas Click: Place Floral Element with Radial Symmetry
@@ -406,23 +399,88 @@ export function PookalamCanvas() {
     ctx.stroke();
   }, [elements]);
 
-  const handleSaveDraft = () => {
+  const featuredEvent = useQuery(api.events.getFeaturedEvent);
+  const eventId = featuredEvent?._id;
+  const userDraft = useQuery(api.pookalam.getUserDraft, eventId && isSignedIn ? { eventId } : "skip");
+
+  const saveDraftMutation = useMutation(api.pookalam.saveDraft);
+  const submitToCompetitionMutation = useMutation(api.pookalam.submitToCompetition);
+
+  // Restore user draft if found
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!draftRestoredRef.current && userDraft && userDraft.canvasData && Array.isArray(userDraft.canvasData)) {
+      draftRestoredRef.current = true;
+      setElements(userDraft.canvasData);
+      if (userDraft.title) setDesignTitle(userDraft.title);
+      if (userDraft.isSubmitted) setIsSubmitted(true);
+    }
+  }, [userDraft]);
+
+  const handleSaveDraft = async () => {
+    if (!eventId || !isSignedIn) {
+      alert("Please sign in to save your Pookalam draft.");
+      return;
+    }
+
     soundFx.playClick();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+    const canvas = canvasRef.current;
+    const previewUrl = canvas ? canvas.toDataURL("image/png") : "";
+
+    try {
+      await saveDraftMutation({
+        eventId,
+        title: designTitle,
+        canvasData: elements,
+        previewUrl,
+        templateId: "custom",
+      });
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save draft";
+      alert(message);
+    }
   };
 
-  const handleSubmitCompetition = () => {
-    soundFx.playVictory();
-    setIsSubmitted(true);
-    updateUserPoints(50, "Pookalam Competition Submission");
+  const handleSubmitCompetition = async () => {
+    if (!eventId || !isSignedIn) {
+      alert("Please sign in to submit your Pookalam.");
+      return;
+    }
 
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ["#ea580c", "#facc15", "#e11d48", "#10b981"],
-    });
+    soundFx.playVictory();
+    const canvas = canvasRef.current;
+    const previewUrl = canvas ? canvas.toDataURL("image/png") : "";
+
+    try {
+      // 1. Save/Upsert draft first to get designId
+      const designId = await saveDraftMutation({
+        eventId,
+        title: designTitle,
+        canvasData: elements,
+        previewUrl,
+        templateId: "custom",
+      });
+
+      // 2. Submit to competition
+      await submitToCompetitionMutation({
+        designId,
+        title: designTitle,
+      });
+
+      setIsSubmitted(true);
+
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ["#ea580c", "#facc15", "#e11d48", "#10b981"],
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to submit to competition";
+      alert(message);
+    }
   };
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, ChevronDown, Menu, X, ShieldCheck, UserCheck, LogOut } from "lucide-react";
@@ -8,14 +8,31 @@ import { BrandLogo } from "@/components/layout/BrandLogo";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { useAuth } from "@/context/AuthContext";
 import { soundFx } from "@/lib/sounds";
+import { useClerk, useUser } from "@clerk/nextjs";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, isSignedIn, isAdmin, isCreator, switchDemoRole } = useAuth();
+  const { user, isSignedIn, isAdmin, isClerkSignedIn } = useAuth();
+  const { openSignIn, signOut } = useClerk();
+  const { user: clerkUser } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileMenuOpen]);
 
   const navLinks = [
     { label: "Home", href: "/" },
@@ -61,14 +78,14 @@ export function Navbar() {
         </nav>
 
         {/* Right Controls: Search, Notifications, User Menu / Auth Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2 lg:gap-3">
           {/* Search Trigger */}
           <button
             onClick={() => {
               soundFx.playClick();
               setShowSearchModal(true);
             }}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
+            className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
             title="Search events & creators"
           >
             <Search className="w-4 h-4" />
@@ -78,7 +95,7 @@ export function Navbar() {
           <NotificationBell />
 
           {/* User Account Dropdown or Login / Join Now Buttons */}
-          {user ? (
+          {isClerkSignedIn || clerkUser ? (
             <div className="relative">
               <button
                 onClick={() => {
@@ -88,12 +105,12 @@ export function Navbar() {
                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-800/80 transition-colors group"
               >
                 <img
-                  src={user.avatarUrl}
-                  alt={user.displayName}
+                  src={user?.avatarUrl || clerkUser?.imageUrl || "https://api.dicebear.com/7.x/bottts/svg?seed=member"}
+                  alt={user?.displayName || clerkUser?.fullName || "Account"}
                   className="w-8 h-8 rounded-xl object-cover border border-emerald-500/40 bg-slate-800"
                 />
                 <span className="text-xs font-bold text-white hidden sm:inline">
-                  {user.displayName}
+                  {user?.displayName || clerkUser?.fullName || "Account"}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
               </button>
@@ -102,9 +119,9 @@ export function Navbar() {
               {showUserDropdown && (
                 <div className="absolute right-0 mt-2 w-56 rounded-2xl glass-panel-gold p-2 shadow-2xl border border-amber-500/30 space-y-1 animate-in fade-in zoom-in-95">
                   <div className="px-3 py-2 border-b border-slate-800">
-                    <div className="text-xs font-black text-white">{user.displayName}</div>
+                    <div className="text-xs font-black text-white">{user?.displayName || clerkUser?.fullName || "Account"}</div>
                     <div className="text-[11px] text-amber-400">
-                      Level {user.level} • {user.points} XP
+                      {user ? `Level ${user.level} • ${user.points} XP` : "Connecting profile…"}
                     </div>
                   </div>
 
@@ -132,35 +149,22 @@ export function Navbar() {
                     </Link>
                   )}
 
-                  {/* Switch Demo Role Quick Buttons for Reviewer */}
                   <div className="pt-2 border-t border-slate-800 space-y-1">
-                    <div className="text-[10px] uppercase font-bold text-slate-500 px-3">
-                      Role Demo Switcher
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 px-1">
-                      <button
-                        onClick={() => switchDemoRole("admin")}
-                        className="text-[10px] font-bold p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      >
-                        Admin
-                      </button>
-                      <button
-                        onClick={() => switchDemoRole("creator")}
-                        className="text-[10px] font-bold p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      >
-                        Creator
-                      </button>
-                    </div>
+                    <button onClick={() => void signOut()} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800">
+                      <LogOut className="w-4 h-4" /> Sign out
+                    </button>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
               <button
                 onClick={() => {
                   soundFx.playClick();
-                  switchDemoRole("user");
+                  if (!clerkUser && !isClerkSignedIn) {
+                    openSignIn();
+                  }
                 }}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-200 border border-slate-700 hover:bg-slate-800 transition-colors"
               >
@@ -169,7 +173,7 @@ export function Navbar() {
               <Link
                 href="/events/onam-2026"
                 onClick={() => soundFx.playClick()}
-                className="px-4 py-2 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition-all hover:scale-105"
+                className="hidden md:inline-flex px-4 py-2 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition-colors"
               >
                 Join Now
               </Link>
@@ -188,7 +192,7 @@ export function Navbar() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-4 py-4 space-y-2 animate-in slide-in-from-top-2">
+        <div className="lg:hidden fixed inset-x-0 top-[var(--mobile-nav-top,7rem)] bottom-0 z-50 bg-slate-950/98 border-b border-slate-800 px-4 py-4 space-y-2 overflow-y-auto animate-in slide-in-from-top-2">
           {navLinks.map((link) => (
             <Link
               key={link.label}
@@ -202,6 +206,17 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
+          {!isClerkSignedIn && !clerkUser && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                openSignIn();
+              }}
+              className="w-full min-h-11 rounded-xl bg-emerald-500 px-4 py-3 text-left text-sm font-black text-slate-950"
+            >
+              Sign in / Join
+            </button>
+          )}
         </div>
       )}
 

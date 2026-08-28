@@ -73,3 +73,24 @@ export const publishAnnouncement = mutation({
     return id;
   },
 });
+
+// Admin: Delete announcement
+export const deleteAnnouncement = mutation({
+  args: { announcementId: v.id("announcements") },
+  handler: async (ctx, args) => {
+    const clerkUserId = await getAuthUserId(ctx);
+    if (!clerkUserId) throw new Error("Unauthorized");
+
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
+      .first();
+
+    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
+      throw new Error("Forbidden");
+    }
+
+    await ctx.db.delete(args.announcementId);
+    return true;
+  },
+});

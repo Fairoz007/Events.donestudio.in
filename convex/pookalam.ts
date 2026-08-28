@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "./profiles";
+import { requireAdmin } from "./lib/auth";
 
 // Save or update Pookalam draft
 export const saveDraft = mutation({
@@ -14,10 +15,15 @@ export const saveDraft = mutation({
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
     if (!clerkUserId) throw new Error("Unauthorized: Please sign in");
+    const pookalamActivities = await ctx.db.query("eventActivities").withIndex("by_eventId", q => q.eq("eventId", args.eventId)).take(100);
+    const pookalamActivity = pookalamActivities.find(a => a.type === "pookalam");
+    if (pookalamActivity && pookalamActivity.submissionsOpen === false) {
+      throw new Error("POOKALAM_SUBMISSIONS_CLOSED");
+    }
 
-    const existingDraft = await (ctx.db as any)
+    const existingDraft = await ctx.db
       .query("pookalamDesigns")
-      .withIndex("by_user_and_event", (q: any) =>
+      .withIndex("by_user_and_event", (q) =>
         q.eq("clerkUserId", clerkUserId).eq("eventId", args.eventId)
       )
       .first();
@@ -92,6 +98,11 @@ export const submitToCompetition = mutation({
     if (!design) throw new Error("Design not found");
     if (design.clerkUserId !== clerkUserId) throw new Error("Unauthorized");
     if (design.isSubmitted) throw new Error("Design is already submitted");
+    const pookalamActivities = await ctx.db.query("eventActivities").withIndex("by_eventId", q => q.eq("eventId", design.eventId)).take(100);
+    const pookalamActivity = pookalamActivities.find(a => a.type === "pookalam");
+    if (pookalamActivity && pookalamActivity.submissionsOpen === false) {
+      throw new Error("POOKALAM_SUBMISSIONS_CLOSED");
+    }
 
     const now = Date.now();
 
@@ -100,6 +111,8 @@ export const submitToCompetition = mutation({
       title: args.title,
       isSubmitted: true,
       isDraft: false,
+      submittedAt: now,
+      submissionStatus: "submitted",
       updatedAt: now,
     });
 
@@ -115,7 +128,7 @@ export const submitToCompetition = mutation({
       canvasData: design.canvasData,
       voteCount: 0,
       viewCount: 1,
-      status: "approved", // Automatically approved for competition gallery
+      status: "submitted",
       createdAt: now,
     });
 
@@ -192,6 +205,11 @@ export const votePookalam = mutation({
 
     const submission = await ctx.db.get(args.submissionId);
     if (!submission) throw new Error("Submission not found");
+    const pookalamActivities = await ctx.db.query("eventActivities").withIndex("by_eventId", q => q.eq("eventId", submission.eventId)).take(100);
+    const pookalamActivity = pookalamActivities.find(a => a.type === "pookalam");
+    if (pookalamActivity && pookalamActivity.votingStatus === "closed") {
+      throw new Error("VOTING_CLOSED");
+    }
 
     if (submission.clerkUserId === clerkUserId) {
       throw new Error("You cannot vote for your own Pookalam!");
@@ -338,6 +356,7 @@ export const awardWinnerBadge = mutation({
 export const adminListSubmissions = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     return await ctx.db
       .query("pookalamSubmissions")
       .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))

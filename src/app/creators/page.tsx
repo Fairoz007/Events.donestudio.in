@@ -7,20 +7,21 @@ import {
   CheckCircle2,
   Youtube,
   Twitch,
-  Instagram,
   ArrowUpRight,
   Sparkles,
   Search,
-  Trophy,
 } from "lucide-react";
-import { INITIAL_CREATORS } from "@/lib/mockData";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { soundFx } from "@/lib/sounds";
 
 export default function CreatorsDirectoryPage() {
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
 
-  const filteredCreators = INITIAL_CREATORS.filter((c) => {
+  const verifiedCreators = useQuery(api.creators.listVerifiedCreators);
+
+  const filteredCreators = (verifiedCreators ?? []).filter((c) => {
     const matchesSearch =
       c.displayName.toLowerCase().includes(search.toLowerCase()) ||
       c.username.toLowerCase().includes(search.toLowerCase()) ||
@@ -85,70 +86,92 @@ export default function CreatorsDirectoryPage() {
       </div>
 
       {/* Creators Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-        {filteredCreators.map((creator) => (
-          <div
-            key={creator._id}
-            className="p-6 rounded-3xl glass-card border border-slate-800 hover:border-amber-500/40 transition-all flex flex-col justify-between group space-y-6"
+      {!verifiedCreators ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-64 rounded-3xl bg-slate-900/60 border border-slate-800 animate-pulse" />
+          ))}
+        </div>
+      ) : filteredCreators.length === 0 ? (
+        <div className="p-16 text-center rounded-3xl glass-panel border border-slate-800 space-y-4">
+          <Users className="w-12 h-12 text-slate-600 mx-auto" />
+          <h3 className="text-lg font-bold text-white">No creators found</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            {search ? "No verified creators match your search query." : "Apply to become the first verified creator in the D-One Creators Guild!"}
+          </p>
+          <Link
+            href="/creators/apply"
+            className="inline-flex px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:brightness-110"
           >
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <img
-                  src={creator.avatarUrl}
-                  alt={creator.displayName}
-                  className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-500/40 bg-slate-800"
-                />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-extrabold text-white text-lg truncate group-hover:text-amber-400 transition-colors">
-                      {creator.displayName}
-                    </h3>
-                    <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 fill-sky-400/20" />
+            Submit Application →
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          {filteredCreators.map((creator) => (
+            <div
+              key={creator._id}
+              className="p-6 rounded-3xl glass-card border border-slate-800 hover:border-amber-500/40 transition-all flex flex-col justify-between group space-y-6"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <img
+                    src={creator.avatarUrl}
+                    alt={creator.displayName}
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-500/40 bg-slate-800"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-extrabold text-white text-lg truncate group-hover:text-amber-400 transition-colors">
+                        {creator.displayName}
+                      </h3>
+                      <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 fill-sky-400/20" />
+                    </div>
+                    <p className="text-xs text-slate-400">@{creator.username}</p>
+                    <div className="text-xs font-bold text-amber-400 mt-1">
+                      {(creator.followerCount / 1000).toFixed(0)}k+ Followers
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400">@{creator.username}</p>
-                  <div className="text-xs font-bold text-amber-400 mt-1">
-                    {(creator.followerCount / 1000).toFixed(0)}k+ Subscribers
-                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">
+                  {creator.bio}
+                </p>
+
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {creator.achievements.map((ach) => (
+                    <span
+                      key={ach}
+                      className="text-[10px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700"
+                    >
+                      {ach}
+                    </span>
+                  ))}
                 </div>
               </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">
-                {creator.bio}
-              </p>
+              <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                  {creator.platform === "youtube" ? (
+                    <Youtube className="w-4 h-4 text-rose-500" />
+                  ) : (
+                    <Twitch className="w-4 h-4 text-purple-400" />
+                  )}
+                  <span className="font-semibold">{creator.channelName}</span>
+                </div>
 
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {creator.achievements.map((ach) => (
-                  <span
-                    key={ach}
-                    className="text-[10px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700"
-                  >
-                    {ach}
-                  </span>
-                ))}
+                <Link
+                  href={`/creators/${creator.username}`}
+                  onClick={() => soundFx.playClick()}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-amber-500 hover:text-slate-950 transition-colors flex items-center gap-1"
+                >
+                  Profile <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
             </div>
-
-            <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                {creator.platform === "youtube" ? (
-                  <Youtube className="w-4 h-4 text-rose-500" />
-                ) : (
-                  <Twitch className="w-4 h-4 text-purple-400" />
-                )}
-                <span className="font-semibold">{creator.channelName}</span>
-              </div>
-
-              <Link
-                href={`/creators/${creator.username}`}
-                onClick={() => soundFx.playClick()}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-amber-500 hover:text-slate-950 transition-colors flex items-center gap-1"
-              >
-                Profile <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,26 @@
 import { mutation } from "./_generated/server";
+import { requireSuperAdmin } from "./lib/auth";
 
 export const seedDatabase = mutation({
   args: {},
   handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
     const existingEvents = await ctx.db.query("events").collect();
+    if (existingEvents.length > 0) {
+      // If already seeded, require super admin
+      await requireSuperAdmin(ctx);
+    }
+
+    const hostId = identity?.subject ?? "system_super_admin";
+    const officialHost = {
+      createdByUserId: hostId,
+      hostUserId: hostId,
+      hostRole: "super_admin" as const,
+      organizationName: "D-One Studio Events",
+      isOfficial: true,
+      isPublished: true,
+    };
+
     if (existingEvents.length > 0) {
       return { message: "Database already seeded with events" };
     }
@@ -12,6 +29,7 @@ export const seedDatabase = mutation({
 
     // 1. Create Flagship Event: ONAM 2026
     const onamEventId = await ctx.db.insert("events", {
+      ...officialHost,
       title: "ONAM 2026",
       slug: "onam-2026",
       tagline: "Celebrate. Play. Compete. Win.",
@@ -127,7 +145,7 @@ export const seedDatabase = mutation({
       order: 2,
     });
 
-    const quizActivityId = await ctx.db.insert("eventActivities", {
+    await ctx.db.insert("eventActivities", {
       eventId: onamEventId,
       title: "Onam Cultural Quiz",
       slug: "quiz",
@@ -267,6 +285,7 @@ export const seedDatabase = mutation({
 
     // 4. Future Events for the Platform
     await ctx.db.insert("events", {
+      ...officialHost,
       title: "D-One Creator Showdown 2026",
       slug: "creator-showdown-2026",
       tagline: "Top Streamers & Creators Battle Live",
@@ -303,6 +322,7 @@ export const seedDatabase = mutation({
     });
 
     await ctx.db.insert("events", {
+      ...officialHost,
       title: "Christmas Carnival 2026",
       slug: "christmas-carnival-2026",
       tagline: "Winter Magic, Quizzes & Holiday Gifts",
@@ -336,6 +356,7 @@ export const seedDatabase = mutation({
     });
 
     await ctx.db.insert("events", {
+      ...officialHost,
       title: "Vishu Festival 2027",
       slug: "vishu-2027",
       tagline: "New Dawn, Vishukani & Golden Harvest",

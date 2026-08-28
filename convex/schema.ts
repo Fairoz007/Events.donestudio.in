@@ -18,6 +18,7 @@ export default defineSchema({
       v.literal("admin"),
       v.literal("super_admin")
     ),
+    canHostEvents: v.optional(v.boolean()),
     points: v.number(),
     level: v.number(),
     joinDate: v.string(),
@@ -37,7 +38,8 @@ export default defineSchema({
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_username", ["username"])
     .index("by_role", ["role"])
-    .index("by_points", ["points"]),
+    .index("by_points", ["points"])
+    .index("by_email", ["email"]),
 
   // Events (Onam 2026, Eid, Christmas, Vishu, Gaming tournaments, etc.)
   events: defineTable({
@@ -56,7 +58,9 @@ export default defineSchema({
       v.literal("scheduled"),
       v.literal("registration_open"),
       v.literal("registration_closed"),
+      v.literal("ready"),
       v.literal("live"),
+      v.literal("paused"),
       v.literal("completed"),
       v.literal("cancelled"),
       v.literal("archived")
@@ -95,7 +99,24 @@ export default defineSchema({
       })
     ),
     organizer: v.string(),
+    createdByUserId: v.optional(v.string()),
+    hostUserId: v.optional(v.string()),
+    hostRole: v.optional(
+      v.union(
+        v.literal("super_admin"),
+        v.literal("admin"),
+        v.literal("creator"),
+        v.literal("moderator")
+      )
+    ),
+    organizationName: v.optional(v.string()),
+    isOfficial: v.optional(v.boolean()),
+    isPublished: v.optional(v.boolean()),
     participantCount: v.number(),
+    pausedAt: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -119,7 +140,12 @@ export default defineSchema({
     bannerUrl: v.string(),
     status: v.union(
       v.literal("upcoming"),
+      v.literal("registration_open"),
+      v.literal("registration_closed"),
       v.literal("live"),
+      v.literal("paused"),
+      v.literal("completed"),
+      v.literal("cancelled"),
       v.literal("closed"),
       v.literal("archived")
     ),
@@ -128,6 +154,15 @@ export default defineSchema({
     participantCount: v.number(),
     startTime: v.optional(v.string()),
     endTime: v.optional(v.string()),
+    registrationStartTime: v.optional(v.number()),
+    registrationCloseTime: v.optional(v.number()),
+    scheduledStartTime: v.optional(v.number()),
+    expectedEndTime: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    pausedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    votingStatus: v.optional(v.union(v.literal("closed"), v.literal("open"))),
+    submissionsOpen: v.optional(v.boolean()),
     order: v.number(),
     config: v.optional(v.any()),
   })
@@ -140,6 +175,9 @@ export default defineSchema({
     eventId: v.id("events"),
     clerkUserId: v.string(),
     registeredAt: v.number(),
+    status: v.optional(v.union(v.literal("registered"), v.literal("cancelled"), v.literal("checked_in"))),
+    activityIds: v.optional(v.array(v.id("eventActivities"))),
+    createdAt: v.optional(v.number()),
   })
     .index("by_eventId_and_user", ["eventId", "clerkUserId"])
     .index("by_user", ["clerkUserId"])
@@ -162,14 +200,14 @@ export default defineSchema({
     channelUrl: v.string(),
     followerCount: v.number(),
     country: v.string(),
-    profileImage: v.string(),
+    profileImage: v.optional(v.union(v.string(), v.null())),
     description: v.string(),
     whyJoin: v.string(),
     socialLinks: v.object({
-      youtube: v.optional(v.string()),
-      twitter: v.optional(v.string()),
-      instagram: v.optional(v.string()),
-      discord: v.optional(v.string()),
+      youtube: v.optional(v.union(v.string(), v.null())),
+      twitter: v.optional(v.union(v.string(), v.null())),
+      instagram: v.optional(v.union(v.string(), v.null())),
+      discord: v.optional(v.union(v.string(), v.null())),
     }),
     status: v.union(
       v.literal("pending"),
@@ -185,6 +223,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_clerkUserId", ["clerkUserId"])
+    .index("by_email", ["email"])
     .index("by_status", ["status"])
     .index("by_createdAt", ["createdAt"]),
 
@@ -204,7 +243,9 @@ export default defineSchema({
     featured: v.boolean(),
     eventsParticipated: v.number(),
     achievements: v.array(v.string()),
+    canHostEvents: v.optional(v.boolean()),
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_username", ["username"])
@@ -249,6 +290,11 @@ export default defineSchema({
     ),
     ropePosition: v.number(), // -100 (Player 1 win) to +100 (Player 2 win), 0 is center
     winner: v.optional(v.string()), // clerkUserId of winner
+    loser: v.optional(v.string()),
+    winnerPoints: v.optional(v.number()),
+    loserPoints: v.optional(v.number()),
+    scheduledAt: v.optional(v.number()),
+    expected: v.optional(v.boolean()),
     durationSeconds: v.optional(v.number()),
     startedAt: v.optional(v.number()),
     endedAt: v.optional(v.number()),
@@ -259,7 +305,8 @@ export default defineSchema({
     .index("by_roomCode", ["roomCode"])
     .index("by_status", ["status"])
     .index("by_player1", ["player1.clerkUserId"])
-    .index("by_createdAt", ["createdAt"]),
+    .index("by_createdAt", ["createdAt"])
+    .index("by_eventId_and_status", ["eventId", "status"]),
 
   // Matchmaking Queue
   matchmakingQueue: defineTable({
@@ -281,6 +328,8 @@ export default defineSchema({
     templateId: v.optional(v.string()),
     isSubmitted: v.boolean(),
     isDraft: v.boolean(),
+    submittedAt: v.optional(v.number()),
+    submissionStatus: v.optional(v.union(v.literal("draft"), v.literal("submitted"), v.literal("approved"), v.literal("rejected"), v.literal("featured"), v.literal("winner"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -344,11 +393,19 @@ export default defineSchema({
     speedBonusMax: v.number(),
     status: v.union(
       v.literal("draft"),
+      v.literal("scheduled"),
+      v.literal("paused"),
       v.literal("live"),
       v.literal("ended"),
       v.literal("archived")
     ),
     createdAt: v.number(),
+    registrationStartTime: v.optional(v.number()),
+    registrationCloseTime: v.optional(v.number()),
+    scheduledStartTime: v.optional(v.number()),
+    expectedEndTime: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    endedAt: v.optional(v.number()),
   })
     .index("by_eventId", ["eventId"])
     .index("by_slug", ["slug"]),
@@ -389,9 +446,23 @@ export default defineSchema({
     isCompleted: v.boolean(),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
+    questionStartedAt: v.optional(v.number()),
+    correctAnswers: v.optional(v.number()),
+    totalResponseTimeMs: v.optional(v.number()),
   })
     .index("by_quiz_and_user", ["quizId", "clerkUserId"])
     .index("by_score", ["score"]),
+
+  eventSchedule: defineTable({
+    eventId: v.id("events"),
+    activityId: v.optional(v.id("eventActivities")),
+    title: v.string(),
+    scheduledAt: v.number(),
+    kind: v.union(v.literal("registration"), v.literal("activity"), v.literal("match"), v.literal("voting"), v.literal("announcement")),
+    status: v.union(v.literal("scheduled"), v.literal("live"), v.literal("completed"), v.literal("cancelled")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_eventId_and_scheduledAt", ["eventId", "scheduledAt"]),
 
   // Leaderboards
   leaderboards: defineTable({
