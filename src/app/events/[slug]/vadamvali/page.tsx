@@ -1,12 +1,13 @@
 // @ts-nocheck
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import { CalendarClock, CheckCircle2, Play, Trophy, Users } from "lucide-react";
+import { CalendarClock, CheckCircle2, Loader2, LogIn, Play, Trophy, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useStableNow } from "@/lib/useStableNow";
+import Link from "next/link";
 
 function fmt(value?: number) {
   if (!value) return "Not set";
@@ -14,18 +15,27 @@ function fmt(value?: number) {
 }
 
 export default function VadamvaliPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSignedIn, isLoaded } = useAuth();
   const now = useStableNow();
   const summary = useQuery(api.onam.getSummary, { now });
   const fixture = useQuery(api.onam.listFixture);
   const my = useQuery(api.onam.getMyOnam, { now });
   const register = useMutation(api.onam.registerForActivity);
+  const ensureSetup = useMutation(api.onam.ensureEventSetup);
   const generate = useMutation(api.onam.generateVadamvaliFixture);
   const openCheckIn = useMutation(api.onam.openNextMatchCheckIn);
   const checkIn = useMutation(api.onam.checkInForMatch);
   const start = useMutation(api.onam.startReadyMatch);
   const record = useMutation(api.onam.recordGameWinner);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regSuccess, setRegSuccess] = useState(false);
+
+  // Ensure settings + tournament documents exist (one-time setup via mutation)
+  useEffect(() => {
+    void ensureSetup();
+  }, [ensureSetup]);
 
   const rounds = fixture?.rounds || [];
   const matches = fixture?.matches || [];
@@ -34,6 +44,21 @@ export default function VadamvaliPage() {
   const myVadamvali = my?.activityRegistrations.some((r) => r.activitySlug === "vadamvali");
   const currentMatch = summary?.currentMatch;
   const nextMatch = summary?.nextMatch;
+
+  const handleRegister = async () => {
+    setRegLoading(true);
+    setRegError(null);
+    try {
+      await register({ activitySlug: "vadamvali" });
+      setRegSuccess(true);
+    } catch (err: any) {
+      setRegError(err?.message || "Registration failed. Please try again.");
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  const isRegistrationOpen = summary?.registrationStatus === "open";
 
   return (
     <main className="min-h-screen bg-[#080b0e] px-4 sm:px-6 lg:px-8 py-10">
@@ -44,19 +69,34 @@ export default function VadamvaliPage() {
             <h1 className="mt-2 text-4xl sm:text-5xl font-black text-white">VADAMVALI FIXTURE</h1>
             <p className="mt-3 text-slate-400">Best-of-3 tournament. First to 2 games wins. Only one tournament match may be live at a time.</p>
           </div>
-          <button
-            disabled={summary?.registrationStatus !== "open" || myVadamvali}
-            onClick={() => void register({ activitySlug: "vadamvali" })}
-            className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 disabled:bg-slate-700 disabled:text-slate-300"
-          >
-            {myVadamvali ? "Registered" : "Register for Vadamvali"}
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            {!isLoaded ? (
+              <div className="rounded-lg bg-slate-700 px-5 py-3 text-sm font-black text-slate-300 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+              </div>
+            ) : !isSignedIn ? (
+              <Link href="/sign-in" className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 flex items-center gap-2 hover:bg-emerald-400 transition-colors">
+                <LogIn className="w-4 h-4" /> Sign In to Register
+              </Link>
+            ) : (
+              <button
+                disabled={!isRegistrationOpen || !!myVadamvali || regLoading}
+                onClick={handleRegister}
+                className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 disabled:bg-slate-700 disabled:text-slate-300 flex items-center gap-2 transition-colors"
+              >
+                {regLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {myVadamvali || regSuccess ? "✓ Registered" : !isRegistrationOpen ? "Registration Closed" : "Register for Vadamvali"}
+              </button>
+            )}
+            {regError && <p className="text-xs text-red-400 max-w-xs text-right">{regError}</p>}
+            {regSuccess && !myVadamvali && <p className="text-xs text-emerald-400">Registration successful!</p>}
+          </div>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Stat icon={<Users className="w-5 h-5 text-emerald-300" />} label="Registrations" value={String(summary?.activeParticipants ?? 0)} />
           <Stat icon={<Trophy className="w-5 h-5 text-amber-300" />} label="Format" value="Best of 3" />
-          <Stat icon={<CalendarClock className="w-5 h-5 text-sky-300" />} label="Registration" value={summary?.registrationStatus === "open" ? "Open" : summary?.registrationStatus || "Loading"} />
+          <Stat icon={<CalendarClock className="w-5 h-5 text-sky-300" />} label="Registration" value={isRegistrationOpen ? "Open" : summary?.registrationStatus === "opens_soon" ? `Opens ${fmt(summary?.settings?.registrationOpensAt)}` : summary?.registrationStatus === "closed" ? "Closed" : summary === undefined ? "Loading…" : "Open"} />
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">

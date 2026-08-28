@@ -79,6 +79,62 @@ function shuffle<T>(items: T[]) {
   return copy;
 }
 
+// Default settings values used when no onamSettings document exists yet.
+// These are returned by the read-only query getter so the UI never blocks.
+function defaultSettings(eventId: Id<"events">) {
+  return {
+    _id: "" as any,
+    _creationTime: 0,
+    eventId,
+    timezone: "Asia/Muscat",
+    registrationOpensAt: muscatTimeOn("2026-08-28", 20, 30),
+    registrationClosesAt: muscatTimeOn("2026-09-04", 20, 30),
+    pookalamSubmissionOpensAt: muscatTimeOn("2026-08-28", 20, 30),
+    pookalamSubmissionClosesAt: muscatTimeOn("2026-09-04", 20, 30),
+    pookalamVotingOpensAt: muscatTimeOn("2026-09-04", 21, 0),
+    pookalamVotingClosesAt: muscatTimeOn("2026-09-05", 21, 0),
+    pookalamLiveVoteCounts: false,
+    pookalamVoteChangesAllowed: true,
+    quizStatus: "lobby" as const,
+    currentActivity: "Registration",
+    nextActivity: "Vadamvali Fixture",
+    updatedAt: 0,
+  };
+}
+
+function defaultTournament(eventId: Id<"events">) {
+  return {
+    _id: "" as any,
+    _creationTime: 0,
+    eventId,
+    status: "registration" as const,
+    format: "best_of_3" as const,
+    seedingMode: "random" as const,
+    tournamentStartsAt: muscatTimeOn("2026-09-04", 21, 0),
+    averageMatchDurationMinutes: 8,
+    transitionMinutes: 2,
+    updatedAt: 0,
+  };
+}
+
+// Read-only: safe for use inside queries (never writes).
+async function getSettings(ctx: any, event: Doc<"events">) {
+  const existing = await ctx.db
+    .query("onamSettings")
+    .withIndex("by_eventId", (q: any) => q.eq("eventId", event._id))
+    .first();
+  return existing || defaultSettings(event._id);
+}
+
+async function getTournament(ctx: any, eventId: Id<"events">) {
+  const existing = await ctx.db
+    .query("vadamvaliTournaments")
+    .withIndex("by_eventId", (q: any) => q.eq("eventId", eventId))
+    .first();
+  return existing || defaultTournament(eventId);
+}
+
+// Write version: creates the row if missing. Only call from mutations.
 async function getOrCreateSettings(ctx: any, event: Doc<"events">) {
   const existing = await ctx.db
     .query("onamSettings")
@@ -130,8 +186,8 @@ export const getSummary = query({
   handler: async (ctx, args) => {
     const event = await getOnamEvent(ctx);
     if (!event) return null;
-    const settings = await getOrCreateSettings(ctx, event);
-    const tournament = await getOrCreateTournament(ctx, event._id);
+    const settings = await getSettings(ctx, event);
+    const tournament = await getTournament(ctx, event._id);
     const activities = await ctx.db.query("eventActivities").withIndex("by_eventId", (q: any) => q.eq("eventId", event._id)).take(10);
     const registrations = await ctx.db.query("eventRegistrations").withIndex("by_eventId", (q: any) => q.eq("eventId", event._id)).take(200);
     const activityRegistrations = await ctx.db.query("activityRegistrations").withIndex("by_event_and_activity", (q: any) => q.eq("eventId", event._id).eq("activitySlug", "vadamvali")).take(200);
@@ -150,6 +206,19 @@ export const getSummary = query({
       currentMatch,
       nextMatch,
     };
+  },
+});
+
+// Mutation to ensure settings + tournament documents exist.
+// Called once from the frontend when the page loads.
+export const ensureEventSetup = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const event = await getOnamEvent(ctx);
+    if (!event) return null;
+    await getOrCreateSettings(ctx, event);
+    await getOrCreateTournament(ctx, event._id);
+    return true;
   },
 });
 
@@ -400,7 +469,8 @@ export const listFixture = query({
   handler: async (ctx) => {
     const event = await getOnamEvent(ctx);
     if (!event) return null;
-    const tournament = await getOrCreateTournament(ctx, event._id);
+    const tournament = await getTournament(ctx, event._id);
+    if (!tournament._id) return { tournament, rounds: [], matches: [] };
     const rounds = await ctx.db.query("tournamentRounds").withIndex("by_tournament", (q: any) => q.eq("tournamentId", tournament._id)).take(20);
     const matches = await ctx.db.query("tournamentMatches").withIndex("by_tournament_and_queue", (q: any) => q.eq("tournamentId", tournament._id)).take(1000);
     return { tournament, rounds: rounds.sort((a: any, b: any) => a.roundNumber - b.roundNumber), matches };
@@ -453,7 +523,7 @@ export const checkInForMatch = mutation({
     const existing = await ctx.db.query("matchCheckIns").withIndex("by_match_and_user", (q: any) => q.eq("matchId", args.matchId).eq("clerkUserId", clerkUserId)).first();
     if (!existing) await ctx.db.insert("matchCheckIns", { matchId: args.matchId, clerkUserId, checkedInAt: now });
     const checkIns = await ctx.db.query("matchCheckIns").withIndex("by_match", (q: any) => q.eq("matchId", args.matchId)).take(2);
-    await ctx.db.patch(match._id, { status: checkIns.length >= 1 ? "ready" : "waiting_for_players", updatedAt: now });
+    await ctx.db.patch(match._id, { status: checkIns.length >= 2 ? "ready" : "waiting_for_players", updatedAt: now });
     const opponent = clerkUserId === match.player1ClerkUserId ? match.player2ClerkUserId : match.player1ClerkUserId;
     if (opponent) {
       await ctx.db.insert("notifications", {
