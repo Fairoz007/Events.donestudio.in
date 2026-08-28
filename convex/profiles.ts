@@ -158,7 +158,7 @@ export async function getOrEnsureProfile(ctx: MutationCtx, clerkUserId: string) 
 
   const autoRole = resolveProfileRole(email);
   const roleToStore = isTrustedAdmin ? "super_admin" : autoRole;
-  const canHostEvents = isTrustedAdmin || roleToStore === "super_admin" || roleToStore === "admin";
+  const canHostEvents = true;
   const now = Date.now();
 
   const newProfileId = await ctx.db.insert("profiles", {
@@ -298,7 +298,7 @@ export const syncProfile = mutation({
               ? existing.role
               : autoRole;
 
-      const canHostEvents = isTrustedAdmin || Boolean(existing.canHostEvents) || roleToStore === "super_admin" || roleToStore === "admin";
+      const canHostEvents = true;
 
       await ctx.db.patch(existing._id, {
         clerkUserId,
@@ -319,7 +319,7 @@ export const syncProfile = mutation({
 
     const autoRole = resolveProfileRole(email);
     const roleToStore = isTrustedAdmin ? "super_admin" : autoRole;
-    const canHostEvents = isTrustedAdmin || roleToStore === "super_admin" || roleToStore === "admin";
+    const canHostEvents = true;
 
     // New profile creation
     const newProfileId = await ctx.db.insert("profiles", {
@@ -397,7 +397,7 @@ export const syncProfileFromClerk = internalMutation({
 
     const now = Date.now();
     const autoRole = resolveProfileRole(args.email);
-    const canHostEvents = isTrustedAdmin || autoRole === "admin";
+    const canHostEvents = true;
 
     if (existing) {
       const roleToStore = isTrustedAdmin ? "admin" : (autoRole === "user" ? existing.role : autoRole);

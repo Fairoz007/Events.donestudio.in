@@ -18,7 +18,7 @@ import { soundFx } from "@/lib/sounds";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
-export function VadamvaliGame() {
+export function VadamvaliGame({ eventSlug = "onam-2026" }: { eventSlug?: string }) {
   const { user, isSignedIn, isClerkSignedIn, isConvexAuthenticated } = useAuth();
 
   const [activeRoomCode, setActiveRoomCode] = useState<string | null>(null);
@@ -35,6 +35,8 @@ export function VadamvaliGame() {
     activeRoomCode ? { roomCode: activeRoomCode } : "skip"
   );
   const userMatches = useQuery(api.matches.listUserMatches, isSignedIn ? {} : "skip");
+  const event = useQuery(api.events.getEventBySlug, { slug: eventSlug });
+  const activity = useQuery(api.activities.getActivityBySlug, { eventSlug, activitySlug: "vadamvali" });
 
   const createPrivateRoomMutation = useMutation(api.matches.createPrivateRoom);
   const joinPrivateRoomMutation = useMutation(api.matches.joinPrivateRoom);
@@ -95,7 +97,7 @@ export function VadamvaliGame() {
     try {
       setErrorMsg(null);
       soundFx.playClick();
-      const res = await findQuickMatchMutation({ activitySlug: "vadamvali" });
+      const res = await findQuickMatchMutation({ activitySlug: "vadamvali", eventId: event?._id });
       setActiveRoomCode(res.roomCode);
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to find match");
@@ -107,7 +109,7 @@ export function VadamvaliGame() {
     try {
       setErrorMsg(null);
       soundFx.playClick();
-      const res = await createPrivateRoomMutation({ activitySlug: "vadamvali" });
+      const res = await createPrivateRoomMutation({ activitySlug: "vadamvali", eventId: event?._id });
       setActiveRoomCode(res.roomCode);
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to create room");
@@ -193,11 +195,11 @@ export function VadamvaliGame() {
       <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-10">
         {/* Back Link */}
         <Link
-          href="/events/onam-2026"
+          href={`/events/${eventSlug}`}
           onClick={() => soundFx.playClick()}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Onam 2026 Arena
+          <ArrowLeft className="w-4 h-4" /> Back to {event?.title ?? "Event"} Arena
         </Link>
 
         {/* Header */}
@@ -211,6 +213,20 @@ export function VadamvaliGame() {
           <p className="text-xs sm:text-sm text-slate-400">
             Kerala&apos;s ultimate test of strength and teamwork! Real-time 1v1 Tug of War with authoritative rope physics, anti-cheat detection, and instant global XP.
           </p>
+          <div className="flex flex-wrap justify-center gap-2 pt-2">
+            <Link
+              href={`/events/${eventSlug}/bracket`}
+              onClick={() => soundFx.playClick()}
+              className="px-4 py-2 rounded-xl text-xs font-black glass-panel border border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+            >
+              Tournament Bracket
+            </Link>
+            {activity && (
+              <span className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900/80 border border-slate-800 text-slate-300">
+                {activity.participantCount} registered
+              </span>
+            )}
+          </div>
         </div>
 
         {isClerkSignedIn && !isConvexAuthenticated && (

@@ -96,6 +96,8 @@ export const submitToCompetition = mutation({
 
     const design = await ctx.db.get(args.designId);
     if (!design) throw new Error("Design not found");
+    const event = await ctx.db.get(design.eventId);
+    if (!event) throw new Error("Event not found");
     if (design.clerkUserId !== clerkUserId) throw new Error("Unauthorized");
     if (design.isSubmitted) throw new Error("Design is already submitted");
     const pookalamActivities = await ctx.db.query("eventActivities").withIndex("by_eventId", q => q.eq("eventId", design.eventId)).take(100);
@@ -147,9 +149,9 @@ export const submitToCompetition = mutation({
     await ctx.db.insert("notifications", {
       clerkUserId: clerkUserId,
       title: "Pookalam Submitted! 🌸",
-      message: `Your Pookalam "${args.title}" is now live in the Onam Competition Gallery! +50 XP awarded.`,
+      message: `Your Pookalam "${args.title}" is now live in the ${event.title} competition gallery! +50 XP awarded.`,
       type: "system",
-      link: `/events/onam-2026/pookalam/gallery`,
+      link: `/events/${event.slug}/pookalam/gallery`,
       isRead: false,
       createdAt: now,
     });
@@ -205,6 +207,7 @@ export const votePookalam = mutation({
 
     const submission = await ctx.db.get(args.submissionId);
     if (!submission) throw new Error("Submission not found");
+    const event = await ctx.db.get(submission.eventId);
     const pookalamActivities = await ctx.db.query("eventActivities").withIndex("by_eventId", q => q.eq("eventId", submission.eventId)).take(100);
     const pookalamActivity = pookalamActivities.find(a => a.type === "pookalam");
     if (pookalamActivity && pookalamActivity.votingStatus === "closed") {
@@ -264,7 +267,7 @@ export const votePookalam = mutation({
         title: "New Pookalam Vote! ❤️",
         message: `Your design "${submission.title}" received a new vote! Total votes: ${newVoteCount}.`,
         type: "pookalam_vote",
-        link: `/events/onam-2026/pookalam/gallery`,
+        link: `/events/${event?.slug ?? "onam-2026"}/pookalam/gallery`,
         isRead: false,
         createdAt: now,
       });
@@ -319,6 +322,7 @@ export const awardWinnerBadge = mutation({
 
     const submission = await ctx.db.get(args.submissionId);
     if (!submission) throw new Error("Submission not found");
+    const event = await ctx.db.get(submission.eventId);
 
     const now = Date.now();
     await ctx.db.patch(submission._id, {
@@ -330,9 +334,9 @@ export const awardWinnerBadge = mutation({
     await ctx.db.insert("notifications", {
       clerkUserId: submission.clerkUserId,
       title: "🎉 Congratulations! Winner Award!",
-      message: `Your Pookalam "${submission.title}" was awarded ${args.badge.replace("_", " ").toUpperCase()} in Onam 2026!`,
+      message: `Your Pookalam "${submission.title}" was awarded ${args.badge.replace("_", " ").toUpperCase()} in ${event?.title ?? "the event"}!`,
       type: "pookalam_winner",
-      link: `/events/onam-2026/pookalam/gallery`,
+      link: `/events/${event?.slug ?? "onam-2026"}/pookalam/gallery`,
       isRead: false,
       createdAt: now,
     });
