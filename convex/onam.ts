@@ -87,16 +87,16 @@ function defaultSettings(eventId: Id<"events">) {
     _creationTime: 0,
     eventId,
     timezone: "Asia/Muscat",
-    registrationOpensAt: muscatTimeOn("2026-08-28", 20, 30),
+    registrationOpensAt: muscatTimeOn("2026-08-29", 19, 0),
     registrationClosesAt: muscatTimeOn("2026-09-04", 20, 30),
-    pookalamSubmissionOpensAt: muscatTimeOn("2026-08-28", 20, 30),
+    pookalamSubmissionOpensAt: muscatTimeOn("2026-08-29", 19, 0),
     pookalamSubmissionClosesAt: muscatTimeOn("2026-09-04", 20, 30),
     pookalamVotingOpensAt: muscatTimeOn("2026-09-04", 21, 0),
     pookalamVotingClosesAt: muscatTimeOn("2026-09-05", 21, 0),
     pookalamLiveVoteCounts: false,
     pookalamVoteChangesAllowed: true,
     quizStatus: "lobby" as const,
-    currentActivity: "Registration",
+    currentActivity: "Registration (Opens Tomorrow at 7:00 PM)",
     nextActivity: "Vadamvali Fixture",
     updatedAt: 0,
   };
@@ -145,16 +145,16 @@ async function getOrCreateSettings(ctx: any, event: Doc<"events">) {
   const settingsId = await ctx.db.insert("onamSettings", {
     eventId: event._id,
     timezone: "Asia/Muscat",
-    registrationOpensAt: muscatTimeOn("2026-08-28", 20, 30),
+    registrationOpensAt: muscatTimeOn("2026-08-29", 19, 0),
     registrationClosesAt: muscatTimeOn("2026-09-04", 20, 30),
-    pookalamSubmissionOpensAt: muscatTimeOn("2026-08-28", 20, 30),
+    pookalamSubmissionOpensAt: muscatTimeOn("2026-08-29", 19, 0),
     pookalamSubmissionClosesAt: muscatTimeOn("2026-09-04", 20, 30),
     pookalamVotingOpensAt: muscatTimeOn("2026-09-04", 21, 0),
     pookalamVotingClosesAt: muscatTimeOn("2026-09-05", 21, 0),
     pookalamLiveVoteCounts: false,
     pookalamVoteChangesAllowed: true,
     quizStatus: "lobby",
-    currentActivity: "Registration",
+    currentActivity: "Registration (Opens Tomorrow at 7:00 PM)",
     nextActivity: "Vadamvali Fixture",
     updatedAt: now,
   });
@@ -210,14 +210,21 @@ export const getSummary = query({
   },
 });
 
-// Mutation to ensure settings + tournament documents exist.
+// Mutation to ensure settings + tournament documents exist and are synchronized.
 // Called once from the frontend when the page loads.
 export const ensureEventSetup = mutation({
   args: {},
   handler: async (ctx) => {
     const event = await getOnamEvent(ctx);
     if (!event) return null;
-    await getOrCreateSettings(ctx, event);
+    const settings = await getOrCreateSettings(ctx, event);
+    const targetOpensAt = muscatTimeOn("2026-08-29", 19, 0);
+    if (settings.registrationOpensAt !== targetOpensAt) {
+      await ctx.db.patch(settings._id, {
+        registrationOpensAt: targetOpensAt,
+        updatedAt: Date.now(),
+      });
+    }
     await getOrCreateTournament(ctx, event._id);
     return true;
   },

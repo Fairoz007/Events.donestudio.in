@@ -28,8 +28,8 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-[#080b0e]/90 backdrop-blur-xl border-b border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
-        <BrandLogo />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between gap-4">
+        <BrandLogo size="md" />
 
         <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
           {navLinks.map((link) => {

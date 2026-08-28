@@ -47,8 +47,14 @@ export function VadamvaliGame({ eventSlug = "onam-2026" }: { eventSlug?: string 
   const startMatchNowMutation = useMutation(api.matches.startMatchNow);
 
   // Determine current player role (player1 or player2)
-  const isPlayer1 = liveMatch?.player1?.clerkUserId === user?.clerkUserId;
-  const isPlayer2 = liveMatch?.player2?.clerkUserId === user?.clerkUserId;
+  const isPlayer1 =
+    liveMatch?.player1?.clerkUserId === user?.clerkUserId ||
+    (user?.clerkUserId && liveMatch?.player1?.clerkUserId?.endsWith(user.clerkUserId)) ||
+    (user?.clerkUserId && user.clerkUserId.endsWith(liveMatch?.player1?.clerkUserId || ""));
+  const isPlayer2 =
+    liveMatch?.player2?.clerkUserId === user?.clerkUserId ||
+    (user?.clerkUserId && liveMatch?.player2?.clerkUserId?.endsWith(user.clerkUserId)) ||
+    (user?.clerkUserId && user.clerkUserId.endsWith(liveMatch?.player2?.clerkUserId || ""));
   const myPlayerRole = isPlayer1 ? "player1" : isPlayer2 ? "player2" : null;
 
   // Determine Game Phase from Convex status

@@ -235,6 +235,13 @@ export const findQuickMatch = mutation({
 });
 
 
+function matchesPlayer(playerClerkUserId: string | undefined, authId: string | null, subject?: string) {
+  if (!playerClerkUserId) return false;
+  if (authId && (playerClerkUserId === authId || playerClerkUserId.endsWith(authId) || authId.endsWith(playerClerkUserId))) return true;
+  if (subject && (playerClerkUserId === subject || playerClerkUserId.endsWith(subject) || subject.endsWith(playerClerkUserId))) return true;
+  return false;
+}
+
 // Set Player Ready in Lobby
 export const setPlayerReady = mutation({
   args: {
@@ -243,7 +250,8 @@ export const setPlayerReady = mutation({
   },
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
-    if (!clerkUserId) throw new Error("Unauthorized");
+    const identity = await ctx.auth.getUserIdentity();
+    if (!clerkUserId && !identity) throw new Error("Unauthorized");
 
     const match = await ctx.db.get(args.matchId);
     if (!match) throw new Error("Match not found");
@@ -252,9 +260,12 @@ export const setPlayerReady = mutation({
     const p1 = { ...match.player1 };
     const p2 = match.player2 ? { ...match.player2 } : undefined;
 
-    if (p1.clerkUserId === clerkUserId) {
+    const isP1 = matchesPlayer(p1.clerkUserId, clerkUserId, identity?.subject);
+    const isP2 = p2 && matchesPlayer(p2.clerkUserId, clerkUserId, identity?.subject);
+
+    if (isP1) {
       p1.isReady = args.isReady;
-    } else if (p2 && p2.clerkUserId === clerkUserId) {
+    } else if (isP2 && p2) {
       p2.isReady = args.isReady;
     } else {
       throw new Error("You are not a player in this match");
@@ -284,10 +295,17 @@ export const setPlayerReady = mutation({
 export const startMatchNow = mutation({
   args: { matchId: v.id("matches") },
   handler: async (ctx, args) => {
-    const { identity } = await requireUser(ctx);
+    const clerkUserId = await getAuthUserId(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!clerkUserId && !identity) throw new Error("Unauthorized");
+
     const match = await ctx.db.get(args.matchId);
     if (!match) return;
-    if (match.player1.clerkUserId !== identity.subject && match.player2?.clerkUserId !== identity.subject) {
+
+    const isP1 = matchesPlayer(match.player1.clerkUserId, clerkUserId, identity?.subject);
+    const isP2 = matchesPlayer(match.player2?.clerkUserId, clerkUserId, identity?.subject);
+
+    if (!isP1 && !isP2) {
       throw new Error("NOT_A_MATCH_PLAYER");
     }
 
@@ -310,7 +328,8 @@ export const pullRope = mutation({
   },
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
-    if (!clerkUserId) throw new Error("Unauthorized");
+    const identity = await ctx.auth.getUserIdentity();
+    if (!clerkUserId && !identity) throw new Error("Unauthorized");
 
     const match = await ctx.db.get(args.matchId);
     if (!match) throw new Error("Match not found");
@@ -320,8 +339,8 @@ export const pullRope = mutation({
     }
 
     const now = Date.now();
-    const isPlayer1 = match.player1.clerkUserId === clerkUserId;
-    const isPlayer2 = match.player2 && match.player2.clerkUserId === clerkUserId;
+    const isPlayer1 = matchesPlayer(match.player1.clerkUserId, clerkUserId, identity?.subject);
+    const isPlayer2 = matchesPlayer(match.player2?.clerkUserId, clerkUserId, identity?.subject);
 
     if (!isPlayer1 && !isPlayer2) {
       throw new Error("Not a player in this match");

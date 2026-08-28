@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowUpRight, Heart } from "lucide-react";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 import { soundFx } from "@/lib/sounds";
 
 export function Footer() {
@@ -10,15 +11,7 @@ export function Footer() {
     <footer className="w-full border-t border-slate-800/80 bg-slate-950/90 text-slate-400 py-10 px-4 sm:px-6 lg:px-8 mt-20">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 via-amber-600 to-emerald-700 flex items-center justify-center">
-              <span className="font-black text-slate-950 text-lg tracking-tighter">D1</span>
-            </div>
-            <div>
-              <div className="font-black text-white text-base tracking-wider">D-ONE STUDIO</div>
-              <div className="text-[9px] font-bold text-amber-400 uppercase tracking-widest">ONAM 2026</div>
-            </div>
-          </div>
+          <BrandLogo size="md" />
           <p className="mt-4 text-xs leading-relaxed text-slate-400">
             A dedicated ONAM 2026 competition platform powered by Clerk authentication and Convex realtime data.
           </p>

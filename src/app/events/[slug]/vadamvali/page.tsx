@@ -158,7 +158,9 @@ export default function VadamvaliPage() {
                 {myVadamvali || regSuccess
                   ? "✓ Registered for Tournament"
                   : !isRegistrationOpen
-                    ? "Tournament Registration Closed"
+                    ? summary?.registrationStatus === "opens_soon"
+                      ? `Registration Opens ${fmt(summary?.settings?.registrationOpensAt)}`
+                      : "Tournament Registration Closed"
                     : "Register for Tournament"}
               </button>
             )}

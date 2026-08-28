@@ -12,6 +12,7 @@
     "start:vinext": "wrangler dev --config dist/server/wrangler.json",
     "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json",
     "typecheck": "tsc --noEmit",
+    "convex:dev": "cross-env CONVEX_TMPDIR=./.convex-tmp convex dev",
     "create-event": "node scripts/createEvent.js"
   },
   "dependencies": {
