@@ -9,9 +9,10 @@ export const listEvents = query({
     status: v.optional(v.string()),
     category: v.optional(v.string()),
     featuredOnly: v.optional(v.boolean()),
+    mode: v.optional(v.union(v.literal("online"), v.literal("offline"), v.literal("hybrid"))),
   },
   handler: async (ctx, args) => {
-    let events = await ctx.db.query("events").order("desc").collect();
+    let events = await ctx.db.query("events").order("desc").take(100);
 
     if (args.featuredOnly) {
       events = events.filter((e) => e.featured);
@@ -19,11 +20,29 @@ export const listEvents = query({
     if (args.category) {
       events = events.filter((e) => e.category === args.category);
     }
+    if (args.mode) {
+      events = events.filter((e) => (e.mode ?? "online") === args.mode);
+    }
     if (args.status && args.status !== "all") {
       events = events.filter((e) => e.status === args.status);
     }
 
     return events;
+  },
+});
+
+export const listOnlineSections = query({
+  args: {},
+  handler: async (ctx) => {
+    const events = (await ctx.db.query("events").order("desc").take(100))
+      .filter((event) => event.isPublished !== false && (event.mode ?? "online") === "online");
+    return {
+      live: events.filter((event) => event.status === "live"),
+      registrationOpen: events.filter((event) => event.status === "registration_open"),
+      upcoming: events.filter((event) => event.status === "scheduled" || event.status === "ready"),
+      past: events.filter((event) => event.status === "completed" || event.status === "archived"),
+      all: events,
+    };
   },
 });
 

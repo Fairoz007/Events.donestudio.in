@@ -12,7 +12,7 @@ import { useClerk, useUser } from "@clerk/nextjs";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, isSignedIn, isAdmin, isClerkSignedIn } = useAuth();
+  const { user, isSignedIn, isAdmin, isStreamer, isClerkSignedIn } = useAuth();
   const { openSignIn, signOut } = useClerk();
   const { user: clerkUser } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -40,6 +40,7 @@ export function Navbar() {
     { label: "Live Events", href: "/events/onam-2026" },
     { label: "Upcoming", href: "/events" },
     { label: "Leaderboards", href: "/leaderboards" },
+    { label: "Streamer", href: "/streamer" },
     { label: "Creators", href: "/creators" },
     { label: "Community", href: "/creators" },
     { label: "About Us", href: "/events/onam-2026#about" },
@@ -146,6 +147,19 @@ export function Navbar() {
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-slate-800 font-semibold"
                     >
                       <ShieldCheck className="w-4 h-4 text-amber-400" /> Admin Dashboard
+                    </Link>
+                  )}
+
+                  {isStreamer && (
+                    <Link
+                      href="/streamer"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setShowUserDropdown(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-200 hover:bg-slate-800 font-semibold"
+                    >
+                      <UserCheck className="w-4 h-4 text-sky-400" /> Streamer Dashboard
                     </Link>
                   )}
 

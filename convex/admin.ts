@@ -95,6 +95,7 @@ export const updateUserRole = mutation({
     newRole: v.union(
       v.literal("visitor"),
       v.literal("user"),
+      v.literal("streamer"),
       v.literal("creator"),
       v.literal("moderator"),
       v.literal("admin"),

@@ -26,7 +26,7 @@ import { soundFx } from "@/lib/sounds";
 export default function AdminControlPage() {
   const { isAdmin, isLoaded, user, isSignedIn } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    "events" | "activities" | "pookalam" | "creators" | "announcements" | "users" | "logs"
+    "events" | "activities" | "pookalam" | "creators" | "streamers" | "announcements" | "users" | "logs"
   >("events");
 
   const [selectedEventId, setSelectedEventId] = useState<Id<"events"> | null>(null);
@@ -41,6 +41,7 @@ export default function AdminControlPage() {
   );
   const platformAnalytics = useQuery(api.admin.getPlatformAnalytics, isAdmin ? {} : "skip");
   const creatorApplications = useQuery(api.creators.listApplicationsForAdmin, isAdmin ? { status: "all" } : "skip");
+  const streamerApplications = useQuery(api.streamers.listApplications, isAdmin ? { status: "all" } : "skip");
   const announcements = useQuery(api.announcements.listGlobalAnnouncements);
   const allUsers = useQuery(api.admin.listUsers, isAdmin ? {} : "skip");
   const auditLogs = useQuery(api.admin.listAuditLogs, isAdmin ? { limit: 50 } : "skip");
@@ -59,6 +60,8 @@ export default function AdminControlPage() {
   const updateUserRoleMutation = useMutation(api.admin.updateUserRole);
   const toggleSuspensionMutation = useMutation(api.admin.toggleSuspension);
   const terminateMatchMutation = useMutation(api.matches.terminateMatch);
+  const generateBracketMutation = useMutation(api.tournaments.generateTournamentBracket);
+  const reviewStreamerMutation = useMutation(api.streamers.reviewApplication);
   const bootstrapSuperAdminMutation = useMutation(api.admin.bootstrapSuperAdmin);
 
   // Form States for Announcement
@@ -295,6 +298,7 @@ export default function AdminControlPage() {
           { id: "activities", label: "🪢 Matches & Activities", icon: Flame },
           { id: "pookalam", label: "🌸 Pookalam Submissions", icon: Sparkles },
           { id: "creators", label: "👥 Creators Guild", icon: Crown },
+          { id: "streamers", label: "📺 Streamers", icon: Users },
           { id: "announcements", label: "📢 Announcements", icon: Bell },
           { id: "users", label: "🛡️ Users & Roles", icon: Users },
           { id: "logs", label: "📜 Audit Logs", icon: FileText },
@@ -448,6 +452,39 @@ export default function AdminControlPage() {
                     </button>
                   )}
 
+                  {act.type === "vadamvali" && (
+                    <div className="space-y-2">
+                      <button
+                        onClick={async () => {
+                          soundFx.playClick();
+                          await setActivityStateMutation({
+                            activityId: act._id,
+                            state: "registration_closed" as any,
+                          });
+                        }}
+                        className="w-full py-2 rounded-xl text-xs font-black bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700"
+                      >
+                        Lock Registration
+                      </button>
+                      <button
+                        onClick={async () => {
+                          soundFx.playVictory();
+                          const result = await generateBracketMutation({ activityId: act._id });
+                          alert(`Bracket generated: ${result.participants} players, ${result.bracketSize} slots, ${result.byes} byes.`);
+                        }}
+                        className="w-full py-2 rounded-xl text-xs font-black bg-amber-500 text-slate-950 hover:bg-amber-400"
+                      >
+                        Generate Tournament Bracket
+                      </button>
+                      <Link
+                        href={`/events/${controlData.event.slug}/bracket`}
+                        className="block w-full py-2 rounded-xl text-xs font-bold text-center glass-panel border border-slate-700 text-slate-200"
+                      >
+                        Open Bracket
+                      </Link>
+                    </div>
+                  )}
+
                   {act.type === "pookalam" && (
                     <div className="flex gap-2">
                       <button
@@ -510,6 +547,55 @@ export default function AdminControlPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeTab === "streamers" && (
+        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4">
+          <h3 className="text-lg font-black text-white">Streamer Applications</h3>
+          {!streamerApplications || streamerApplications.length === 0 ? (
+            <p className="text-xs text-slate-500 py-4 text-center">No streamer applications yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {streamerApplications.map((app: any) => (
+                <div key={app._id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong className="text-white text-sm">{app.name}</strong>
+                      <p className="text-slate-400">@{app.username} · {app.platform}</p>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300">
+                      {app.status}
+                    </span>
+                  </div>
+                  <p className="text-slate-300">{app.description}</p>
+                  <a href={app.channelUrl} target="_blank" rel="noreferrer" className="block text-amber-400 truncate">
+                    {app.channelUrl}
+                  </a>
+                  <div className="flex gap-2 pt-2 border-t border-slate-800">
+                    <button
+                      onClick={async () => {
+                        soundFx.playVictory();
+                        await reviewStreamerMutation({ applicationId: app._id, status: "approved" });
+                      }}
+                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={async () => {
+                        soundFx.playClick();
+                        await reviewStreamerMutation({ applicationId: app._id, status: "rejected", adminNotes: "Application rejected by admin." });
+                      }}
+                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/30"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

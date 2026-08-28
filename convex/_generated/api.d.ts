@@ -23,6 +23,8 @@ import type * as pookalam from "../pookalam.js";
 import type * as profiles from "../profiles.js";
 import type * as quizzes from "../quizzes.js";
 import type * as seed from "../seed.js";
+import type * as streamers from "../streamers.js";
+import type * as tournaments from "../tournaments.js";
 
 import type {
   ApiFromModules,
@@ -46,6 +48,8 @@ declare const fullApi: ApiFromModules<{
   profiles: typeof profiles;
   quizzes: typeof quizzes;
   seed: typeof seed;
+  streamers: typeof streamers;
+  tournaments: typeof tournaments;
 }>;
 
 /**
