@@ -1,7 +1,11 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api.js";
 
-const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL || "https://precise-wolverine-704.convex.cloud");
+if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+  throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
+}
+
+const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
 
 async function main() {
   console.log("Creating/updating Hook Gaming Championship 2026 event...");

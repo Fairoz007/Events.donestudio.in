@@ -42,7 +42,7 @@ export default defineSchema({
     .index("by_points", ["points"])
     .index("by_email", ["email"]),
 
-  // Events (Onam 2026, Eid, Christmas, Vishu, Gaming tournaments, etc.)
+  // Dedicated ONAM 2026 event. Activities hang off this single event.
   events: defineTable({
     title: v.string(),
     slug: v.string(),
@@ -54,6 +54,9 @@ export default defineSchema({
     endDate: v.string(),
     registrationStartDate: v.string(),
     registrationEndDate: v.string(),
+    timezone: v.optional(v.string()),
+    registrationOpensAt: v.optional(v.number()),
+    registrationClosesAt: v.optional(v.number()),
     mode: v.optional(v.union(v.literal("online"), v.literal("offline"), v.literal("hybrid"))),
     eventType: v.optional(
       v.union(
@@ -130,6 +133,7 @@ export default defineSchema({
     isOfficial: v.optional(v.boolean()),
     isPublished: v.optional(v.boolean()),
     participantCount: v.number(),
+    activeParticipantCount: v.optional(v.number()),
     pausedAt: v.optional(v.number()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
@@ -255,6 +259,8 @@ export default defineSchema({
     matchDurationMinutes: v.number(),
     intervalMinutes: v.number(),
     simultaneousMatches: v.number(),
+    checkInWindowMinutes: v.optional(v.number()),
+    currentMatchId: v.optional(v.id("tournamentMatches")),
     generatedAt: v.optional(v.number()),
     winnerClerkUserId: v.optional(v.string()),
     createdAt: v.number(),
@@ -306,22 +312,35 @@ export default defineSchema({
     player2AvatarUrl: v.optional(v.string()),
     player1Ready: v.boolean(),
     player2Ready: v.boolean(),
+    player1CheckedInAt: v.optional(v.number()),
+    player2CheckedInAt: v.optional(v.number()),
     player1GameWins: v.number(),
     player2GameWins: v.number(),
     winnerClerkUserId: v.optional(v.string()),
+    loserClerkUserId: v.optional(v.string()),
+    matchResultType: v.optional(v.union(v.literal("played"), v.literal("walkover"), v.literal("bye"), v.literal("admin_review"))),
+    resultReason: v.optional(v.string()),
     nextMatchId: v.optional(v.id("tournamentMatches")),
     nextSlot: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
     status: v.union(
       v.literal("scheduled"),
+      v.literal("upcoming"),
+      v.literal("ready_for_checkin"),
       v.literal("waiting"),
       v.literal("ready"),
       v.literal("live"),
       v.literal("completed"),
+      v.literal("walkover"),
+      v.literal("no_show"),
+      v.literal("admin_review"),
       v.literal("forfeit"),
       v.literal("disconnected"),
       v.literal("cancelled")
     ),
     scheduledAt: v.optional(v.number()),
+    expectedStartAt: v.optional(v.number()),
+    checkInOpenedAt: v.optional(v.number()),
+    checkInDeadlineAt: v.optional(v.number()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -700,6 +719,11 @@ export default defineSchema({
       v.literal("pookalam_vote"),
       v.literal("pookalam_winner"),
       v.literal("event_announcement"),
+      v.literal("registration"),
+      v.literal("fixture"),
+      v.literal("match_ready"),
+      v.literal("walkover"),
+      v.literal("quiz"),
       v.literal("system")
     ),
     link: v.optional(v.string()),

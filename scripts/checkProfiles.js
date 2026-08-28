@@ -1,6 +1,10 @@
 import { ConvexHttpClient } from "convex/browser";
 
-const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL || "https://precise-wolverine-704.convex.cloud");
+if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+  throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
+}
+
+const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
 
 async function main() {
   console.log("Checking profiles in Convex URL:", client);

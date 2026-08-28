@@ -32,61 +32,39 @@ export const seedDatabase = mutation({
       ...officialHost,
       title: "ONAM 2026",
       slug: "onam-2026",
-      tagline: "Celebrate. Play. Compete. Win.",
+      tagline: "The grand Kerala cultural celebration presented by D-One Studio.",
       description:
-        "The grandest Kerala cultural extravaganza presented by D-One Studio! Experience real-time Vadamvali Tug of War multiplayer battles, unleash your creativity in the Digital Pookalam Designer competition, and test your knowledge in the high-stakes Cultural Quiz.",
+        "Compete in real-time Vadamvali, create and publish your Digital Pookalam, and test your knowledge in the Onam Cultural Quiz.",
       bannerUrl: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&w=1600&q=80",
       thumbnailUrl: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&w=600&q=80",
       startDate: "2026-08-25T00:00:00Z",
       endDate: "2026-09-05T23:59:59Z",
       registrationStartDate: "2026-08-15T00:00:00Z",
       registrationEndDate: "2026-09-04T23:59:59Z",
-      status: "live",
+      timezone: "Asia/Muscat",
+      registrationOpensAt: Date.parse("2026-08-28T20:30:00+04:00"),
+      registrationClosesAt: Date.parse("2026-09-04T23:59:59+04:00"),
+      status: "scheduled",
       category: "festival",
       theme: {
         primaryColor: "#064e3b", // Deep emerald
         secondaryColor: "#f59e0b", // Gold
         accentColor: "#ea580c", // Marigold orange
         bgGradient: "from-emerald-950 via-slate-950 to-amber-950",
-        bannerBadge: "LIVE NOW • FLAGSHIP FESTIVAL",
-        festivalIcon: "🌸",
+        bannerBadge: "ONAM 2026",
+        festivalIcon: "ONAM",
       },
       featured: true,
       rules: [
-        "All registered D-One Studio members are eligible for competitive leaderboards.",
-        "Anti-cheat mechanisms are strictly enforced for Vadamvali; automated clickers will disqualify the match.",
-        "Pookalam designs must be original creations designed within the canvas tool.",
-        "Quizzes are timed with strict server validation; correct answers cannot be retried within the same session.",
+        "Register for ONAM 2026 before entering individual activities.",
+        "Vadamvali tournament matches are Best of 3 and run one live match at a time.",
+        "Digital Pookalam submissions and votes are validated by Convex.",
+        "Quiz scoring is calculated on the server.",
       ],
-      prizes: [
-        {
-          place: "1st Place (Grand Champion)",
-          title: "Onam Gold Trophy + ₹50,000 + 5,000 Platform XP",
-          reward: "₹50,000 + Exclusive Crown Badge",
-          icon: "👑",
-        },
-        {
-          place: "2nd Place",
-          title: "Silver Shield + ₹25,000 + 2,500 Platform XP",
-          reward: "₹25,000 + Champion Badge",
-          icon: "🥈",
-        },
-        {
-          place: "3rd Place",
-          title: "Bronze Medal + ₹10,000 + 1,000 Platform XP",
-          reward: "₹10,000 + Elite Badge",
-          icon: "🥉",
-        },
-        {
-          place: "People's Choice Pookalam",
-          title: "Special Creator Award + ₹15,000",
-          reward: "₹15,000 + Master Artist Badge",
-          icon: "🎨",
-        },
-      ],
+      prizes: [],
       sponsors: [
         {
-          name: "D-One Gaming Studio",
+          name: "D-One Studio",
           logoUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=DOneStudio",
           tier: "Title Sponsor",
           websiteUrl: "https://donestudio.events",
@@ -103,7 +81,8 @@ export const seedDatabase = mutation({
         },
       ],
       organizer: "D-One Studio Events Board",
-      participantCount: 14820,
+      participantCount: 0,
+      activeParticipantCount: 0,
       createdAt: now,
       updatedAt: now,
     });
@@ -114,16 +93,20 @@ export const seedDatabase = mutation({
       title: "Vadamvali (Tug of War)",
       slug: "vadamvali",
       type: "vadamvali",
-      description: "Real-time multiplayer browser tug-of-war! Quick match with random opponents or battle friends in private rooms.",
+      description: "Realtime Tug of War tournament with automatic fixture generation, Best of 3 matchups, check-in, walkovers, and one live match at a time.",
       bannerUrl: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=800&q=80",
-      status: "live",
+      status: "registration_open",
       rules: [
-        "Tap repeatedly or mash SPACE/CLICK to pull the rope.",
-        "Pull the center flag past the marker to win the round.",
-        "Win matches to earn +100 XP and climb the Onam leaderboard.",
+        "Register after joining ONAM 2026.",
+        "Every matchup is Best of 3; first to 2 game wins advances.",
+        "Check in within 15 minutes when your match becomes ready.",
       ],
       pointsReward: 100,
-      participantCount: 9240,
+      participantCount: 0,
+      registrationStartTime: Date.parse("2026-08-28T20:30:00+04:00"),
+      registrationCloseTime: Date.parse("2026-09-04T23:59:59+04:00"),
+      scheduledStartTime: Date.parse("2026-09-05T20:30:00+04:00"),
+      config: { seedingMethod: "random", matchDurationMinutes: 10, intervalMinutes: 2, simultaneousMatches: 1, checkInWindowMinutes: 15 },
       order: 1,
     });
 
@@ -134,14 +117,19 @@ export const seedDatabase = mutation({
       type: "pookalam",
       description: "Interactive digital floral mandala canvas. Design with marigolds, roses, lotus, and jasmine, then submit to the grand public voting gallery.",
       bannerUrl: "https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=800&q=80",
-      status: "live",
+      status: "registration_open",
       rules: [
         "Drag and place floral assets on the circular mandala canvas.",
         "Use symmetry tools (4x, 8x, 12x, 16x) to create intricate Kerala patterns.",
         "Submit your design to enter the community voting competition.",
       ],
       pointsReward: 50,
-      participantCount: 4320,
+      participantCount: 0,
+      registrationStartTime: Date.parse("2026-08-28T20:30:00+04:00"),
+      registrationCloseTime: Date.parse("2026-09-04T23:59:59+04:00"),
+      votingStatus: "closed",
+      submissionsOpen: true,
+      config: { votingRule: "one_final_vote", allowVoteChange: true, showLiveVoteCounts: false },
       order: 2,
     });
 
@@ -152,14 +140,17 @@ export const seedDatabase = mutation({
       type: "quiz",
       description: "Test your knowledge on Mahabali, Vallamkali, Onasadya, and Kerala folklore in a fast-paced 15-second timed challenge.",
       bannerUrl: "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&w=800&q=80",
-      status: "live",
+      status: "registration_open",
       rules: [
         "10 multiple choice questions with a 15-second countdown per question.",
         "Faster answers award speed bonuses up to +50 points.",
         "Consecutive correct answers build streak multipliers.",
       ],
       pointsReward: 1000,
-      participantCount: 6810,
+      participantCount: 0,
+      registrationStartTime: Date.parse("2026-08-28T20:30:00+04:00"),
+      registrationCloseTime: Date.parse("2026-09-04T23:59:59+04:00"),
+      scheduledStartTime: Date.parse("2026-09-05T22:00:00+04:00"),
       order: 3,
     });
 
@@ -173,8 +164,11 @@ export const seedDatabase = mutation({
       totalQuestions: 10,
       pointsPerCorrect: 100,
       speedBonusMax: 50,
-      status: "live",
+      status: "scheduled",
       createdAt: now,
+      registrationStartTime: Date.parse("2026-08-28T20:30:00+04:00"),
+      registrationCloseTime: Date.parse("2026-09-04T23:59:59+04:00"),
+      scheduledStartTime: Date.parse("2026-09-05T22:00:00+04:00"),
     });
 
     const questions = [
@@ -283,113 +277,7 @@ export const seedDatabase = mutation({
       });
     }
 
-    // 4. Future Events for the Platform
-    await ctx.db.insert("events", {
-      ...officialHost,
-      title: "D-One Creator Showdown 2026",
-      slug: "creator-showdown-2026",
-      tagline: "Top Streamers & Creators Battle Live",
-      description: "Join your favorite YouTubers, Twitch streamers, and gaming personalities in a 3-day streaming marathon with live community matches and massive fan giveaways.",
-      bannerUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=600&q=80",
-      startDate: "2026-10-10T14:00:00Z",
-      endDate: "2026-10-13T23:59:59Z",
-      registrationStartDate: "2026-09-15T00:00:00Z",
-      registrationEndDate: "2026-10-09T23:59:59Z",
-      status: "registration_open",
-      category: "creator",
-      theme: {
-        primaryColor: "#7c3aed",
-        secondaryColor: "#ec4899",
-        accentColor: "#38bdf8",
-        bgGradient: "from-purple-950 via-slate-950 to-pink-950",
-        bannerBadge: "REGISTRATION OPEN",
-        festivalIcon: "🎮",
-      },
-      featured: false,
-      rules: [
-        "Creator accounts must have a verified badge to host matches.",
-        "Community members can vote and participate in live streamer squads.",
-      ],
-      prizes: [
-        { place: "Top Streamer", title: "D-One Creator Trophy + ₹100,000", reward: "₹100,000", icon: "🏆" },
-      ],
-      sponsors: [{ name: "D-One Studio", logoUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=DOne", tier: "Title" }],
-      organizer: "D-One Creator Guild",
-      participantCount: 3840,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("events", {
-      ...officialHost,
-      title: "Christmas Carnival 2026",
-      slug: "christmas-carnival-2026",
-      tagline: "Winter Magic, Quizzes & Holiday Gifts",
-      description: "Celebrate the warmth of the holidays with global community mini-games, Christmas Carol quizzes, digital card creations, and holiday prizes.",
-      bannerUrl: "https://images.unsplash.com/photo-1543589077-47d81606c1bf?auto=format&fit=crop&w=1600&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1543589077-47d81606c1bf?auto=format&fit=crop&w=600&q=80",
-      startDate: "2026-12-20T00:00:00Z",
-      endDate: "2026-12-28T23:59:59Z",
-      registrationStartDate: "2026-12-01T00:00:00Z",
-      registrationEndDate: "2026-12-25T23:59:59Z",
-      status: "scheduled",
-      category: "festival",
-      theme: {
-        primaryColor: "#dc2626",
-        secondaryColor: "#16a34a",
-        accentColor: "#fbbf24",
-        bgGradient: "from-red-950 via-slate-950 to-emerald-950",
-        bannerBadge: "DECEMBER 2026",
-        festivalIcon: "🎄",
-      },
-      featured: false,
-      rules: ["Open to all participants worldwide."],
-      prizes: [
-        { place: "Grand Winter Winner", title: "Holiday Gift Hamper + ₹40,000", reward: "₹40,000", icon: "🎁" },
-      ],
-      sponsors: [{ name: "D-One Studio", logoUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=Winter", tier: "Title" }],
-      organizer: "D-One Studio Events",
-      participantCount: 1920,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("events", {
-      ...officialHost,
-      title: "Vishu Festival 2027",
-      slug: "vishu-2027",
-      tagline: "New Dawn, Vishukani & Golden Harvest",
-      description: "Welcome the astronomical Malayalam New Year with traditional Vishukani digital arrangements, firecracker games, and cultural competitions.",
-      bannerUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1600&q=80",
-      thumbnailUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80",
-      startDate: "2027-04-12T00:00:00Z",
-      endDate: "2027-04-16T23:59:59Z",
-      registrationStartDate: "2027-04-01T00:00:00Z",
-      registrationEndDate: "2027-04-14T23:59:59Z",
-      status: "scheduled",
-      category: "festival",
-      theme: {
-        primaryColor: "#ca8a04",
-        secondaryColor: "#15803d",
-        accentColor: "#facc15",
-        bgGradient: "from-yellow-950 via-slate-950 to-green-950",
-        bannerBadge: "COMING APRIL 2027",
-        festivalIcon: "✨",
-      },
-      featured: false,
-      rules: ["Standard D-One Studio competition terms apply."],
-      prizes: [
-        { place: "Vishukani Master", title: "Golden Kani Trophy + ₹30,000", reward: "₹30,000", icon: "✨" },
-      ],
-      sponsors: [{ name: "D-One Studio", logoUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=Vishu", tier: "Title" }],
-      organizer: "D-One Studio Events",
-      participantCount: 850,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // 5. Seed Starter Achievements
+    // 4. Seed Starter Achievements
     const achievementsList = [
       { code: "FIRST_MATCH", title: "First Pull", description: "Completed your first Vadamvali Tug of War match.", icon: "🪢", category: "vadamvali" as const, pointsReward: 50 },
       { code: "VADAMVALI_5_WINS", title: "Tug Warrior", description: "Won 5 Vadamvali multiplayer matches.", icon: "⚔️", category: "vadamvali" as const, pointsReward: 150 },
@@ -397,18 +285,17 @@ export const seedDatabase = mutation({
       { code: "POOKALAM_ARTIST", title: "Pookalam Artist", description: "Created and submitted your first digital floral design.", icon: "🌸", category: "pookalam" as const, pointsReward: 50 },
       { code: "POOKALAM_POPULAR", title: "Community Star", description: "Received 10+ votes on your Pookalam design.", icon: "❤️", category: "pookalam" as const, pointsReward: 100 },
       { code: "QUIZ_MASTER", title: "Quiz Master", description: "Scored 800+ points in the Onam Cultural Quiz.", icon: "🎯", category: "quiz" as const, pointsReward: 200 },
-      { code: "VERIFIED_CREATOR", title: "Verified Creator", description: "Became an approved D-One Studio creator partner.", icon: "🌟", category: "creator" as const, pointsReward: 500 },
     ];
 
     for (const a of achievementsList) {
       await ctx.db.insert("achievements", a);
     }
 
-    // 6. Seed Global Announcements
+    // 5. Seed Global Announcements
     await ctx.db.insert("announcements", {
       eventId: onamEventId,
-      title: "🎉 ONAM 2026 is LIVE! Join Vadamvali, Pookalam & Quiz Now",
-      content: "Welcome to D-One Studio Events! Compete in real-time Vadamvali, design your digital Pookalam, and climb the leaderboards for ₹100,000+ in grand prizes.",
+      title: "ONAM 2026 registration opens at 8:30 PM",
+      content: "Welcome to D-One Studio ONAM 2026. Register for ONAM, then join Vadamvali, Digital Pookalam, and the Onam Cultural Quiz.",
       type: "urgent",
       isGlobal: true,
       publishedAt: now,
@@ -417,14 +304,14 @@ export const seedDatabase = mutation({
 
     await ctx.db.insert("announcements", {
       eventId: onamEventId,
-      title: "🪢 Vadamvali Quick Matches Now Active",
-      content: "Real-time matchmaking is in full swing! Challenge opponents in 1v1 Tug of War and win bonus XP for your team.",
+      title: "Vadamvali fixture will be generated from real registrations",
+      content: "The tournament will use random backend seeding, bye handling, Best of 3 matchups, and one live match at a time.",
       type: "tournament",
       isGlobal: false,
       publishedAt: now - 3600000,
       authorName: "Tournament Master",
     });
 
-    return { message: "Successfully seeded D-One Studio Events platform with Onam 2026 and future events!" };
+    return { message: "Successfully seeded dedicated D-One Studio ONAM 2026 platform." };
   },
 });
