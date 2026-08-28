@@ -6,8 +6,7 @@ import { api } from "../../../../../../convex/_generated/api";
 import { useStableNow } from "@/lib/useStableNow";
 
 export default function PookalamGalleryPage() {
-  const now = useStableNow();
-  const summary = useQuery(api.onam.getSummary, { now });
+  const summary = useQuery(api.onam.getSummary, {});
   const submissions = useQuery(
     api.pookalam.listGallery,
     summary?.event ? { eventId: summary.event._id, filter: "latest" } : "skip"

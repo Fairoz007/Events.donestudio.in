@@ -16,8 +16,7 @@ function fmt(value?: number) {
 
 export default function DashboardPage() {
   const { isSignedIn } = useAuth();
-  const now = useStableNow();
-  const data = useQuery(api.onam.getMyOnam, { now });
+  const data = useQuery(api.onam.getMyOnam, {});
 
   if (!isSignedIn) {
     return (

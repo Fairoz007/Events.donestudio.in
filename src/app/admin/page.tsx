@@ -14,8 +14,7 @@ function fmt(value?: number) {
 
 export default function AdminPage() {
   const { isAdmin } = useAuth();
-  const now = useStableNow();
-  const summary = useQuery(api.onam.getSummary, { now });
+  const summary = useQuery(api.onam.getSummary, {});
   const fixture = useQuery(api.onam.listFixture);
   const generate = useMutation(api.onam.generateVadamvaliFixture);
   const openCheckIn = useMutation(api.onam.openNextMatchCheckIn);

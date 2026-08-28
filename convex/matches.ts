@@ -481,6 +481,37 @@ export const listUserMatches = query({
   },
 });
 
+// Public: List live and waiting match rooms for spectating or discovery
+export const listPublicLiveMatches = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("matches")
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "in_progress"),
+          q.eq(q.field("status"), "countdown"),
+          q.eq(q.field("status"), "lobby"),
+          q.eq(q.field("status"), "waiting")
+        )
+      )
+      .order("desc")
+      .take(20);
+  },
+});
+
+// Public: List recent completed matches
+export const listRecentMatches = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("matches")
+      .withIndex("by_status", (q) => q.eq("status", "completed"))
+      .order("desc")
+      .take(args.limit || 15);
+  },
+});
+
 // Admin: List all live matches
 export const listLiveMatches = query({
   args: {},

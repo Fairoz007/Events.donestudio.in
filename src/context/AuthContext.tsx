@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect } from "react";
 import { useUser, useAuth as useClerkAuth } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 export interface UserProfile {
@@ -31,6 +31,8 @@ export interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   isSignedIn: boolean;
+  isClerkSignedIn: boolean;
+  isConvexAuthenticated: boolean;
   isLoaded: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
@@ -44,6 +46,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isSignedIn: false,
+  isClerkSignedIn: false,
+  isConvexAuthenticated: false,
   isLoaded: false,
   isAdmin: false,
   isSuperAdmin: false,
@@ -56,6 +60,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const { signOut } = useClerkAuth();
   const profile = useQuery(api.profiles.getCurrentProfile);
   const syncProfile = useMutation(api.profiles.syncProfile);
@@ -82,6 +87,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       value={{
         user,
         isSignedIn: !!isSignedIn,
+        isClerkSignedIn: !!isSignedIn,
+        isConvexAuthenticated,
         isLoaded,
         isAdmin,
         isSuperAdmin,

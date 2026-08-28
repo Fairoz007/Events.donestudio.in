@@ -19,8 +19,7 @@ function formatTime(value?: number) {
 }
 
 export function HeroBanner() {
-  const now = useStableNow();
-  const summary = useQuery(api.onam.getSummary, { now });
+  const summary = useQuery(api.onam.getSummary, {});
   const event = summary?.event;
   const statusLabel =
     summary?.registrationStatus === "open"

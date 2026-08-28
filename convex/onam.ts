@@ -182,7 +182,7 @@ async function getOrCreateTournament(ctx: any, eventId: Id<"events">) {
 }
 
 export const getSummary = query({
-  args: { now: v.number() },
+  args: { now: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const event = await getOnamEvent(ctx);
     if (!event) return null;
@@ -195,12 +195,13 @@ export const getSummary = query({
     const nextMatch =
       (await ctx.db.query("tournamentMatches").withIndex("by_event_and_status", (q: any) => q.eq("eventId", event._id).eq("status", "ready_for_checkin")).first()) ||
       (await ctx.db.query("tournamentMatches").withIndex("by_event_and_status", (q: any) => q.eq("eventId", event._id).eq("status", "upcoming")).first());
+    const clientNow = args.now ?? Date.now();
     return {
       event,
       settings,
       tournament,
       activities: activities.sort((a: any, b: any) => a.order - b.order),
-      registrationStatus: args.now < settings.registrationOpensAt ? "opens_soon" : args.now <= settings.registrationClosesAt ? "open" : "closed",
+      registrationStatus: clientNow < settings.registrationOpensAt ? "opens_soon" : clientNow <= settings.registrationClosesAt ? "open" : "closed",
       registeredUsers: registrations.length,
       activeParticipants: activityRegistrations.length,
       currentMatch,
@@ -223,7 +224,7 @@ export const ensureEventSetup = mutation({
 });
 
 export const getMyOnam = query({
-  args: { now: v.number() },
+  args: { now: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
     const event = await getOnamEvent(ctx);
@@ -245,7 +246,7 @@ export const getMyOnam = query({
       matchHistory: matches.filter((m: any) => ["completed", "walkover", "no_show"].includes(m.status)).slice(0, 10),
       pookalam,
       notifications,
-      now: args.now,
+      now: args.now ?? Date.now(),
     };
   },
 });

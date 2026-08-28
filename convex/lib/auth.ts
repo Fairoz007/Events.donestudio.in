@@ -7,10 +7,15 @@ type Ctx = QueryCtx | MutationCtx;
 export async function requireUser(ctx: Ctx) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("UNAUTHENTICATED");
+  const clerkUserId = identity.tokenIdentifier || identity.subject;
   let profile = await ctx.db.query("profiles")
-    .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", identity.subject)).unique();
+    .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId)).first();
+  if (!profile && identity.subject) {
+    profile = await ctx.db.query("profiles")
+      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", identity.subject)).first();
+  }
   if (!profile && "insert" in ctx.db) {
-    profile = await getOrEnsureProfile(ctx as MutationCtx, identity.subject);
+    profile = await getOrEnsureProfile(ctx as MutationCtx, clerkUserId);
   }
   if (!profile) throw new Error("PROFILE_NOT_FOUND");
   if (profile.isBanned) throw new Error("ACCOUNT_BANNED");

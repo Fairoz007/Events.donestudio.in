@@ -12,8 +12,7 @@ function fmt(value?: number) {
 }
 
 export default function StreamerControlPage() {
-  const now = useStableNow();
-  const summary = useQuery(api.onam.getSummary, { now });
+  const summary = useQuery(api.onam.getSummary, {});
   const fixture = useQuery(api.onam.listFixture);
   const openCheckIn = useMutation(api.onam.openNextMatchCheckIn);
   const start = useMutation(api.onam.startReadyMatch);

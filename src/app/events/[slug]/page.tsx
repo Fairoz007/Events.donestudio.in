@@ -16,11 +16,10 @@ function fmt(value?: number) {
 
 export default function OnamEventPage() {
   const { isSignedIn, isLoaded } = useAuth();
-  const now = useStableNow();
-  const summary = useQuery(api.onam.getSummary, { now });
+  const summary = useQuery(api.onam.getSummary, {});
   const register = useMutation(api.onam.registerForOnam);
   const ensureSetup = useMutation(api.onam.ensureEventSetup);
-  const my = useQuery(api.onam.getMyOnam, { now });
+  const my = useQuery(api.onam.getMyOnam, {});
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
   const [regSuccess, setRegSuccess] = useState(false);
