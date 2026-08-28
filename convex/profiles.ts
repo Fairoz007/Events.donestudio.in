@@ -5,7 +5,7 @@ import { v } from "convex/values";
 export async function getAuthUserId(ctx: any) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
-  return identity.subject; // Clerk User ID
+  return identity.tokenIdentifier;
 }
 
 // Get the current user's profile
@@ -70,10 +70,13 @@ export const syncProfile = mutation({
     country: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const authUserId = await getAuthUserId(ctx);
+    if (!authUserId) throw new Error("Unauthorized");
+
     // Check if profile exists
     const existing = await ctx.db
       .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", authUserId))
       .first();
 
     const now = Date.now();
@@ -95,7 +98,7 @@ export const syncProfile = mutation({
 
     // New profile creation
     const newProfileId = await ctx.db.insert("profiles", {
-      clerkUserId: args.clerkUserId,
+      clerkUserId: authUserId,
       username: cleanUsername,
       displayName: args.displayName || cleanUsername,
       avatarUrl: args.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
@@ -121,9 +124,9 @@ export const syncProfile = mutation({
 
     // Award initial welcome notification
     await ctx.db.insert("notifications", {
-      clerkUserId: args.clerkUserId,
-      title: "Welcome to D-One Studio Events!",
-      message: "You've earned 100 Welcome XP! Explore Onam 2026 and join Vadamvali, Pookalam & Quiz competitions.",
+      clerkUserId: authUserId,
+      title: "Welcome to D-One Studio ONAM 2026",
+      message: "Your profile is ready. Register for ONAM 2026, then join Vadamvali, Digital Pookalam, and the Onam Cultural Quiz.",
       type: "system",
       link: "/events/onam-2026",
       isRead: false,

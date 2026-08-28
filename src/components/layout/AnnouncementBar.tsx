@@ -20,7 +20,7 @@ export function AnnouncementBar() {
           <Sparkles className="w-4 h-4 text-amber-200 shrink-0 hidden sm:inline" />
           <span className="font-bold text-amber-200">ONAM 2026 IS LIVE!</span>
           <span className="hidden md:inline text-amber-100">
-            Compete in Vadamvali Tug of War, Pookalam Designer & Cultural Quiz for ₹100,000+ in prizes.
+            Register for Vadamvali, Digital Pookalam, and the Onam Cultural Quiz.
           </span>
           <Link
             href="/events/onam-2026"

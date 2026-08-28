@@ -44,6 +44,20 @@ export const startQuizSession = mutation({
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
     if (!clerkUserId) throw new Error("Unauthorized: Please sign in to play the Quiz");
+    const quiz = await ctx.db.get(args.quizId);
+    if (!quiz) throw new Error("Quiz not found");
+    const registration = await ctx.db
+      .query("eventRegistrations")
+      .withIndex("by_eventId_and_user", (q) => q.eq("eventId", quiz.eventId).eq("clerkUserId", clerkUserId))
+      .first();
+    if (!registration) throw new Error("Register for ONAM 2026 before joining the quiz.");
+    const settings = await ctx.db
+      .query("onamSettings")
+      .withIndex("by_eventId", (q) => q.eq("eventId", quiz.eventId))
+      .first();
+    if (settings && settings.quizStatus !== "live") {
+      throw new Error("The Onam Cultural Quiz has not been started by the host.");
+    }
 
     // Look for uncompleted session
     const existing = await ctx.db
@@ -90,6 +104,15 @@ export const submitAnswer = mutation({
     if (!session) throw new Error("Session not found");
     if (session.clerkUserId !== clerkUserId) throw new Error("Unauthorized");
     if (session.isCompleted) throw new Error("Quiz already completed");
+    const quiz = await ctx.db.get(session.quizId);
+    if (!quiz) throw new Error("Quiz not found");
+    const settings = await ctx.db
+      .query("onamSettings")
+      .withIndex("by_eventId", (q) => q.eq("eventId", quiz.eventId))
+      .first();
+    if (settings && settings.quizStatus !== "live") {
+      throw new Error("Quiz is not live.");
+    }
 
     // Fetch quiz questions
     const questions = await ctx.db

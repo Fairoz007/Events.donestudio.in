@@ -39,7 +39,7 @@ export default defineSchema({
     .index("by_role", ["role"])
     .index("by_points", ["points"]),
 
-  // Events (Onam 2026, Eid, Christmas, Vishu, Gaming tournaments, etc.)
+  // ONAM 2026 event
   events: defineTable({
     title: v.string(),
     slug: v.string(),
@@ -139,11 +139,150 @@ export default defineSchema({
   eventRegistrations: defineTable({
     eventId: v.id("events"),
     clerkUserId: v.string(),
+    registrationRef: v.optional(v.string()),
     registeredAt: v.number(),
   })
     .index("by_eventId_and_user", ["eventId", "clerkUserId"])
     .index("by_user", ["clerkUserId"])
     .index("by_eventId", ["eventId"]),
+
+  activityRegistrations: defineTable({
+    eventId: v.id("events"),
+    activitySlug: v.union(v.literal("vadamvali"), v.literal("pookalam"), v.literal("quiz")),
+    clerkUserId: v.string(),
+    registrationRef: v.string(),
+    status: v.union(v.literal("registered"), v.literal("cancelled"), v.literal("waitlisted")),
+    registeredAt: v.number(),
+  })
+    .index("by_event_and_activity", ["eventId", "activitySlug"])
+    .index("by_event_activity_and_user", ["eventId", "activitySlug", "clerkUserId"])
+    .index("by_user", ["clerkUserId"]),
+
+  onamSettings: defineTable({
+    eventId: v.id("events"),
+    timezone: v.string(),
+    registrationOpensAt: v.number(),
+    registrationClosesAt: v.number(),
+    pookalamSubmissionOpensAt: v.number(),
+    pookalamSubmissionClosesAt: v.number(),
+    pookalamVotingOpensAt: v.number(),
+    pookalamVotingClosesAt: v.number(),
+    pookalamLiveVoteCounts: v.boolean(),
+    pookalamVoteChangesAllowed: v.boolean(),
+    quizStatus: v.union(v.literal("registration"), v.literal("lobby"), v.literal("live"), v.literal("paused"), v.literal("finished")),
+    currentActivity: v.optional(v.string()),
+    nextActivity: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_eventId", ["eventId"]),
+
+  eventHosts: defineTable({
+    eventId: v.id("events"),
+    clerkUserId: v.string(),
+    permission: v.union(v.literal("streamer"), v.literal("event_host")),
+    grantedBy: v.string(),
+    grantedAt: v.number(),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_event_and_user", ["eventId", "clerkUserId"])
+    .index("by_event_and_permission", ["eventId", "permission"]),
+
+  vadamvaliTournaments: defineTable({
+    eventId: v.id("events"),
+    status: v.union(v.literal("registration"), v.literal("fixture_ready"), v.literal("live"), v.literal("completed")),
+    format: v.literal("best_of_3"),
+    seedingMode: v.union(v.literal("random"), v.literal("ranking"), v.literal("manual")),
+    maxParticipants: v.optional(v.number()),
+    tournamentStartsAt: v.number(),
+    averageMatchDurationMinutes: v.number(),
+    transitionMinutes: v.number(),
+    currentMatchId: v.optional(v.id("tournamentMatches")),
+    championClerkUserId: v.optional(v.string()),
+    generatedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_eventId", ["eventId"]),
+
+  vadamvaliParticipants: defineTable({
+    eventId: v.id("events"),
+    tournamentId: v.optional(v.id("vadamvaliTournaments")),
+    clerkUserId: v.string(),
+    displayName: v.string(),
+    avatarUrl: v.string(),
+    seed: v.optional(v.number()),
+    eliminated: v.boolean(),
+    registeredAt: v.number(),
+  })
+    .index("by_event_and_user", ["eventId", "clerkUserId"])
+    .index("by_tournament_and_seed", ["tournamentId", "seed"]),
+
+  tournamentRounds: defineTable({
+    tournamentId: v.id("vadamvaliTournaments"),
+    eventId: v.id("events"),
+    roundNumber: v.number(),
+    name: v.string(),
+    size: v.number(),
+    status: v.union(v.literal("waiting"), v.literal("active"), v.literal("completed")),
+  })
+    .index("by_tournament", ["tournamentId"])
+    .index("by_tournament_and_round", ["tournamentId", "roundNumber"]),
+
+  tournamentMatches: defineTable({
+    tournamentId: v.id("vadamvaliTournaments"),
+    eventId: v.id("events"),
+    roundId: v.id("tournamentRounds"),
+    roundNumber: v.number(),
+    matchNumber: v.number(),
+    queuePosition: v.number(),
+    player1ClerkUserId: v.optional(v.string()),
+    player1Name: v.optional(v.string()),
+    player2ClerkUserId: v.optional(v.string()),
+    player2Name: v.optional(v.string()),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("upcoming"),
+      v.literal("ready_for_checkin"),
+      v.literal("waiting_for_players"),
+      v.literal("ready"),
+      v.literal("live"),
+      v.literal("completed"),
+      v.literal("walkover"),
+      v.literal("no_show"),
+      v.literal("cancelled"),
+      v.literal("admin_review")
+    ),
+    expectedStartAt: v.optional(v.number()),
+    checkInOpenedAt: v.optional(v.number()),
+    checkInClosesAt: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    winnerClerkUserId: v.optional(v.string()),
+    loserClerkUserId: v.optional(v.string()),
+    matchResultType: v.optional(v.union(v.literal("played"), v.literal("walkover"), v.literal("bye"), v.literal("no_show"))),
+    reason: v.optional(v.string()),
+    nextMatchId: v.optional(v.id("tournamentMatches")),
+    nextSlot: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+    player1Wins: v.number(),
+    player2Wins: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tournament_and_queue", ["tournamentId", "queuePosition"])
+    .index("by_tournament_and_status", ["tournamentId", "status"])
+    .index("by_event_and_status", ["eventId", "status"])
+    .index("by_player1", ["player1ClerkUserId"])
+    .index("by_player2", ["player2ClerkUserId"]),
+
+  matchGames: defineTable({
+    matchId: v.id("tournamentMatches"),
+    gameNumber: v.number(),
+    winnerClerkUserId: v.string(),
+    recordedBy: v.string(),
+    recordedAt: v.number(),
+  }).index("by_match", ["matchId"]),
+
+  matchCheckIns: defineTable({
+    matchId: v.id("tournamentMatches"),
+    clerkUserId: v.string(),
+    checkedInAt: v.number(),
+  }).index("by_match_and_user", ["matchId", "clerkUserId"]).index("by_match", ["matchId"]),
 
   // Creator Applications
   creatorApplications: defineTable({

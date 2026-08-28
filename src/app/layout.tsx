@@ -15,9 +15,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "D-One Studio Events | ONAM 2026 & Digital Championship Arena",
+  title: "D-One Studio ONAM 2026",
   description:
-    "Discover festivals, tournaments, online competitions, and creator campaigns. Experience real-time Vadamvali Tug of War, Pookalam Designer, and Cultural Trivia on D-One Studio Events.",
+    "The dedicated D-One Studio ONAM 2026 arena for Vadamvali, Digital Pookalam, and the Onam Cultural Quiz.",
   keywords: [
     "D-One Studio",
     "Onam 2026",
@@ -25,8 +25,6 @@ export const metadata: Metadata = {
     "Pookalam",
     "Online Tug of War",
     "Kerala Festival Games",
-    "Gaming Tournaments",
-    "Creator Events",
   ],
   authors: [{ name: "D-One Studio" }],
 };

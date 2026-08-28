@@ -1,11 +1,3 @@
 {
-  "/page": "app/page.js",
-  "/events/[slug]/pookalam/page": "app/events/[slug]/pookalam/page.js",
-  "/events/[slug]/vadamvali/page": "app/events/[slug]/vadamvali/page.js",
-  "/events/[slug]/page": "app/events/[slug]/page.js",
-  "/leaderboards/page": "app/leaderboards/page.js",
-  "/events/page": "app/events/page.js",
-  "/creators/page": "app/creators/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/events/[slug]/page": "app/events/[slug]/page.js"
 }

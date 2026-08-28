@@ -92,8 +92,20 @@ export const submitToCompetition = mutation({
     if (!design) throw new Error("Design not found");
     if (design.clerkUserId !== clerkUserId) throw new Error("Unauthorized");
     if (design.isSubmitted) throw new Error("Design is already submitted");
+    const registration = await ctx.db
+      .query("eventRegistrations")
+      .withIndex("by_eventId_and_user", (q) => q.eq("eventId", design.eventId).eq("clerkUserId", clerkUserId))
+      .first();
+    if (!registration) throw new Error("Register for ONAM 2026 before publishing a Pookalam.");
 
+    const settings = await ctx.db
+      .query("onamSettings")
+      .withIndex("by_eventId", (q) => q.eq("eventId", design.eventId))
+      .first();
     const now = Date.now();
+    if (settings && (now < settings.pookalamSubmissionOpensAt || now > settings.pookalamSubmissionClosesAt)) {
+      throw new Error("Pookalam submission is not open.");
+    }
 
     // Mark design as submitted
     await ctx.db.patch(design._id, {
@@ -181,7 +193,7 @@ export const getSubmissionById = query({
   },
 });
 
-// Vote for a Pookalam submission (1 vote per user per submission enforced)
+// Vote for a Pookalam submission (1 final vote per user per event enforced)
 export const votePookalam = mutation({
   args: {
     submissionId: v.id("pookalamSubmissions"),
@@ -197,19 +209,45 @@ export const votePookalam = mutation({
       throw new Error("You cannot vote for your own Pookalam!");
     }
 
-    // Check if user already voted
-    const existingVote = await ctx.db
+    const registration = await ctx.db
+      .query("eventRegistrations")
+      .withIndex("by_eventId_and_user", (q) => q.eq("eventId", submission.eventId).eq("clerkUserId", clerkUserId))
+      .first();
+    if (!registration) throw new Error("Register for ONAM 2026 before voting.");
+
+    const settings = await ctx.db
+      .query("onamSettings")
+      .withIndex("by_eventId", (q) => q.eq("eventId", submission.eventId))
+      .first();
+    const now = Date.now();
+    if (settings && (now < settings.pookalamVotingOpensAt || now > settings.pookalamVotingClosesAt)) {
+      throw new Error("Pookalam voting is not open.");
+    }
+
+    const duplicateSubmissionVote = await ctx.db
       .query("pookalamVotes")
       .withIndex("by_submission_and_user", (q) =>
         q.eq("submissionId", args.submissionId).eq("clerkUserId", clerkUserId)
       )
       .first();
 
-    if (existingVote) {
-      throw new Error("You have already voted for this design!");
+    if (duplicateSubmissionVote) {
+      return { success: true, voteCount: submission.voteCount };
     }
 
-    const now = Date.now();
+    const existingEventVote = await ctx.db
+      .query("pookalamVotes")
+      .withIndex("by_user_and_event", (q) => q.eq("clerkUserId", clerkUserId).eq("eventId", submission.eventId))
+      .first();
+
+    if (existingEventVote) {
+      if (!settings?.pookalamVoteChangesAllowed) throw new Error("You have already used your final Pookalam vote.");
+      const oldSubmission = await ctx.db.get(existingEventVote.submissionId);
+      if (oldSubmission) {
+        await ctx.db.patch(oldSubmission._id, { voteCount: Math.max(0, oldSubmission.voteCount - 1) });
+      }
+      await ctx.db.delete(existingEventVote._id);
+    }
 
     // Insert vote record
     await ctx.db.insert("pookalamVotes", {
@@ -271,6 +309,18 @@ export const hasUserVoted = query({
       .first();
 
     return !!vote;
+  },
+});
+
+export const getMyVoteForEvent = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    const clerkUserId = await getAuthUserId(ctx);
+    if (!clerkUserId) return null;
+    return await ctx.db
+      .query("pookalamVotes")
+      .withIndex("by_user_and_event", (q) => q.eq("clerkUserId", clerkUserId).eq("eventId", args.eventId))
+      .first();
   },
 });
 
