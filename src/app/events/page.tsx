@@ -2,28 +2,28 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Search, Calendar, Trophy, Users, Sparkles, Filter, ChevronRight, Play } from "lucide-react";
-import { INITIAL_EVENTS } from "@/lib/mockData";
+import { Search, Calendar, ChevronRight } from "lucide-react";
 import { soundFx } from "@/lib/sounds";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Doc } from "../../../convex/_generated/dataModel";
 
 export default function EventsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
 
-  const filteredEvents = INITIAL_EVENTS.filter((e) => {
+  const events = useQuery(api.events.listEvents, {
+    category: selectedCategory === "all" ? undefined : selectedCategory,
+    status: selectedStatus === "all" ? undefined : selectedStatus,
+  });
+  const filteredEvents = (events ?? []).filter((e: Doc<"events">) => {
     const matchesSearch =
       e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.tagline.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory =
-      selectedCategory === "all" || e.category === selectedCategory;
-
-    const matchesStatus =
-      selectedStatus === "all" || e.status === selectedStatus;
-
-    return matchesSearch && matchesCategory && matchesStatus;
+    return matchesSearch;
   });
 
   return (
@@ -86,7 +86,9 @@ export default function EventsPage() {
 
       {/* Events Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-        {filteredEvents.length === 0 ? (
+        {events === undefined ? (
+          <div className="col-span-full py-16 text-center text-sm text-slate-400">Loading official events…</div>
+        ) : filteredEvents.length === 0 ? (
           <div className="col-span-full py-16 text-center space-y-3">
             <Calendar className="w-12 h-12 text-slate-600 mx-auto" />
             <h3 className="text-lg font-bold text-white">No events found</h3>
@@ -95,7 +97,7 @@ export default function EventsPage() {
             </p>
           </div>
         ) : (
-          filteredEvents.map((evt) => {
+          filteredEvents.map((evt: Doc<"events">) => {
             const isLive = evt.status === "live";
 
             return (

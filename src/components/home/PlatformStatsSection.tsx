@@ -1,38 +1,47 @@
 "use client";
 
 import React from "react";
-import { Users, Trophy, Flame, Sparkles, Award, ShieldCheck } from "lucide-react";
+import { Users, Trophy, Flame, Sparkles } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export function PlatformStatsSection() {
+  const publicStats = useQuery(api.admin.getPublicPlatformStats);
+
+  const totalUsers = publicStats?.totalUsers ?? 0;
+  const totalMatches = publicStats?.totalMatches ?? 0;
+  const pookalamSubmissions = publicStats?.pookalamSubmissions ?? 0;
+  const totalPoints = publicStats?.totalPointsAwarded ?? 0;
+
   const stats = [
     {
-      label: "Total Registered Players",
-      value: "14,820+",
+      label: "Registered Players",
+      value: totalUsers > 0 ? totalUsers.toLocaleString() : "1+",
       subtext: "Across Kerala & Worldwide",
       icon: Users,
       color: "text-amber-400",
       bg: "bg-amber-500/10 border-amber-500/20",
     },
     {
-      label: "Vadamvali Matches Played",
-      value: "9,240+",
+      label: "Vadamvali Matches",
+      value: totalMatches > 0 ? totalMatches.toLocaleString() : "0",
       subtext: "Live 1v1 Tug of War Duels",
       icon: Flame,
       color: "text-orange-400",
       bg: "bg-orange-500/10 border-orange-500/20",
     },
     {
-      label: "Digital Pookalams Created",
-      value: "4,320+",
-      subtext: "Artworks Submitted to Gallery",
+      label: "Digital Pookalams",
+      value: pookalamSubmissions > 0 ? pookalamSubmissions.toLocaleString() : "0",
+      subtext: "Artworks in Community Gallery",
       icon: Sparkles,
       color: "text-emerald-400",
       bg: "bg-emerald-500/10 border-emerald-500/20",
     },
     {
       label: "Platform XP Distributed",
-      value: "1,250,000+",
-      subtext: "Leaderboard & Level Ups",
+      value: totalPoints > 0 ? `${totalPoints.toLocaleString()} XP` : "0 XP",
+      subtext: "Leaderboards & Achievements",
       icon: Trophy,
       color: "text-yellow-400",
       bg: "bg-yellow-500/10 border-yellow-500/20",

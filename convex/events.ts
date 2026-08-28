@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "./profiles";
+import { requireAdmin, requireEventHost, requireUser } from "./lib/auth";
 
 // List all events with optional status/category filter
 export const listEvents = query({
@@ -51,7 +52,8 @@ export const getFeaturedEvent = query({
     if (featured) return featured;
 
     // Fallback to latest live or scheduled event
-    return await ctx.db.query("events").order("desc").first();
+    const events = await ctx.db.query("events").order("desc").take(10);
+    return events[0] ?? null;
   },
 });
 
@@ -62,48 +64,56 @@ export const isUserRegistered = query({
     const clerkUserId = await getAuthUserId(ctx);
     if (!clerkUserId) return false;
 
-    const registration = await (ctx.db as any)
+    const registration = await ctx.db
       .query("eventRegistrations")
-      .withIndex("by_eventId_and_user", (q: any) =>
+      .withIndex("by_eventId_and_user", (q) =>
         q.eq("eventId", args.eventId).eq("clerkUserId", clerkUserId)
       )
       .first();
 
-    return !!registration;
+    return !!registration && registration.status !== "cancelled";
   },
 });
 
 // Register user for an event
 export const registerForEvent = mutation({
-  args: { eventId: v.id("events") },
+  args: { eventId: v.id("events"), activityIds: v.optional(v.array(v.id("eventActivities"))) },
   handler: async (ctx, args) => {
-    const clerkUserId = await getAuthUserId(ctx);
-    if (!clerkUserId) throw new Error("Unauthorized: Please sign in to join the event");
+    const { identity } = await requireUser(ctx);
+    const clerkUserId = identity.subject;
 
     const event = await ctx.db.get(args.eventId);
     if (!event) throw new Error("Event not found");
-
-    if (event.status === "cancelled" || event.status === "archived") {
-      throw new Error("This event is no longer active for registration");
-    }
+    if (event.status === "cancelled" || event.status === "archived") throw new Error("EVENT_NOT_AVAILABLE");
+    const now = Date.now();
 
     // Check duplicate
-    const existing = await (ctx.db as any)
+    const existing = await ctx.db
       .query("eventRegistrations")
-      .withIndex("by_eventId_and_user", (q: any) =>
+      .withIndex("by_eventId_and_user", (q) =>
         q.eq("eventId", args.eventId).eq("clerkUserId", clerkUserId)
       )
       .first();
 
     if (existing) {
+      if (existing.status === "cancelled") {
+        await ctx.db.patch(existing._id, { status: "registered", registeredAt: now });
+        await ctx.db.patch(args.eventId, {
+          participantCount: (event.participantCount || 0) + 1,
+          updatedAt: now,
+        });
+        return { success: true, alreadyRegistered: false };
+      }
       return { success: true, alreadyRegistered: true };
     }
 
-    const now = Date.now();
     await ctx.db.insert("eventRegistrations", {
       eventId: args.eventId,
       clerkUserId: clerkUserId,
       registeredAt: now,
+      status: "registered",
+      activityIds: args.activityIds ?? [],
+      createdAt: now,
     });
 
     // Increment participant count
@@ -127,7 +137,40 @@ export const registerForEvent = mutation({
   },
 });
 
-// Admin: Create Event
+// Admin: Set default/featured event
+export const setDefaultEvent = mutation({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    const { identity, profile } = await requireAdmin(ctx);
+    
+    // Unset current featured
+    const allFeatured = await ctx.db
+      .query("events")
+      .withIndex("by_featured", (q) => q.eq("featured", true))
+      .collect();
+
+    for (const e of allFeatured) {
+      await ctx.db.patch(e._id, { featured: false, updatedAt: Date.now() });
+    }
+
+    // Set new featured
+    await ctx.db.patch(args.eventId, { featured: true, updatedAt: Date.now() });
+
+    await ctx.db.insert("adminLogs", {
+      adminClerkUserId: identity.subject,
+      adminDisplayName: profile.displayName,
+      action: "DEFAULT_EVENT_CHANGED",
+      entity: "events",
+      entityId: args.eventId,
+      details: {},
+      timestamp: Date.now(),
+    });
+
+    return true;
+  },
+});
+
+// Admin / Host: Create Event
 export const createEvent = mutation({
   args: {
     title: v.string(),
@@ -146,6 +189,7 @@ export const createEvent = mutation({
       v.literal("registration_open"),
       v.literal("registration_closed"),
       v.literal("live"),
+      v.literal("paused"),
       v.literal("completed"),
       v.literal("cancelled"),
       v.literal("archived")
@@ -186,17 +230,8 @@ export const createEvent = mutation({
     organizer: v.string(),
   },
   handler: async (ctx, args) => {
-    const clerkUserId = await getAuthUserId(ctx);
-    if (!clerkUserId) throw new Error("Unauthorized");
-
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-      .first();
-
-    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
-      throw new Error("Forbidden: Admin privileges required");
-    }
+    const { identity, profile } = await requireEventHost(ctx);
+    const clerkUserId = identity.subject;
 
     const existingSlug = await ctx.db
       .query("events")
@@ -208,8 +243,15 @@ export const createEvent = mutation({
     }
 
     const now = Date.now();
+    const hostRole = profile.role === "super_admin" ? "super_admin" : (profile.role === "admin" ? "admin" : "creator");
     const eventId = await ctx.db.insert("events", {
       ...args,
+      createdByUserId: clerkUserId,
+      hostUserId: clerkUserId,
+      hostRole,
+      organizationName: profile.displayName || "D-One Studio Events",
+      isOfficial: profile.role === "super_admin" || profile.role === "admin",
+      isPublished: args.status !== "draft",
       participantCount: 0,
       createdAt: now,
       updatedAt: now,
@@ -248,6 +290,7 @@ export const updateEvent = mutation({
         v.literal("registration_open"),
         v.literal("registration_closed"),
         v.literal("live"),
+        v.literal("paused"),
         v.literal("completed"),
         v.literal("cancelled"),
         v.literal("archived")
@@ -296,22 +339,14 @@ export const updateEvent = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const clerkUserId = await getAuthUserId(ctx);
-    if (!clerkUserId) throw new Error("Unauthorized");
-
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-      .first();
-
-    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
-      throw new Error("Forbidden: Admin privileges required");
-    }
+    const { identity, profile } = await requireAdmin(ctx);
+    const clerkUserId = identity.subject;
 
     const { id, ...updates } = args;
     const now = Date.now();
     await ctx.db.patch(id, {
       ...updates,
+      isPublished: updates.status !== undefined ? updates.status !== "draft" : undefined,
       updatedAt: now,
     });
 
@@ -333,17 +368,8 @@ export const updateEvent = mutation({
 export const deleteEvent = mutation({
   args: { id: v.id("events") },
   handler: async (ctx, args) => {
-    const clerkUserId = await getAuthUserId(ctx);
-    if (!clerkUserId) throw new Error("Unauthorized");
-
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-      .first();
-
-    if (!profile || profile.role !== "super_admin") {
-      throw new Error("Forbidden: Super Admin privileges required");
-    }
+    const { identity, profile } = await requireAdmin(ctx);
+    const clerkUserId = identity.subject;
 
     const event = await ctx.db.get(args.id);
     if (!event) throw new Error("Event not found");

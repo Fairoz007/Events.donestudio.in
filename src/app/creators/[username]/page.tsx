@@ -4,41 +4,50 @@ import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  Users,
   CheckCircle2,
   Youtube,
-  Twitch,
   Instagram,
   ArrowLeft,
-  Trophy,
   ExternalLink,
   Award,
-  Sparkles,
-  Flame,
 } from "lucide-react";
-import { INITIAL_CREATORS } from "@/lib/mockData";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { soundFx } from "@/lib/sounds";
 
 export default function CreatorProfilePage() {
   const params = useParams();
   const username = params?.username as string;
 
-  const creator = INITIAL_CREATORS.find((c) => c.username === username) || {
-    _id: `c_${username}`,
-    displayName: username.replace(/_/g, " ").toUpperCase(),
-    username: username,
-    avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`,
-    platform: "youtube",
-    channelName: username,
-    channelUrl: `https://youtube.com/@${username}`,
-    followerCount: 75000,
-    bio: "Official D-One Studio verified creator and tournament host.",
-    socialLinks: { youtube: `https://youtube.com/@${username}` },
-    verified: true,
-    featured: true,
-    eventsParticipated: 2,
-    achievements: ["Verified Creator", "D-One Pioneer"],
-  };
+  const creator = useQuery(api.creators.getCreatorByUsername, username ? { username } : "skip");
+
+  if (creator === undefined) {
+    return (
+      <div className="min-h-screen py-16 px-4 max-w-5xl mx-auto text-center space-y-4 text-slate-400">
+        <p>Loading creator profile…</p>
+      </div>
+    );
+  }
+
+  if (creator === null) {
+    return (
+      <div className="min-h-screen py-16 px-4 max-w-2xl mx-auto text-center space-y-6">
+        <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-2xl">
+          🔍
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-white">Creator Not Found</h2>
+          <p className="text-xs text-slate-400">No verified creator profile exists with handle @{username}.</p>
+        </div>
+        <Link
+          href="/creators"
+          className="inline-flex px-6 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:brightness-110"
+        >
+          ← Back to Creator Directory
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-10">

@@ -1,174 +1,83 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import React, { createContext, useContext, useEffect } from "react";
+import { api } from "../../convex/_generated/api";
 
-export interface UserProfile {
-  clerkUserId: string;
-  username: string;
-  displayName: string;
-  avatarUrl: string;
-  email: string;
-  country: string;
-  role: "visitor" | "user" | "creator" | "moderator" | "admin" | "super_admin";
-  points: number;
-  level: number;
-  joinDate: string;
-  isSuspended: boolean;
-  isBanned: boolean;
-  stats: {
-    vadamvaliWins: number;
-    vadamvaliLosses: number;
-    quizzesTaken: number;
-    quizHighScore: number;
-    pookalamsSubmitted: number;
-    pookalamVotesReceived: number;
-  };
-}
+type UserProfile = NonNullable<ReturnType<typeof useQuery<typeof api.profiles.getCurrentProfile>>>;
 
 interface AuthContextType {
   user: UserProfile | null;
   isSignedIn: boolean;
+  isClerkSignedIn: boolean;
+  isConvexAuthenticated: boolean;
   isLoaded: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isCreator: boolean;
-  login: (profile: Partial<UserProfile>) => void;
-  logout: () => void;
+  canHostEvents: boolean;
   switchDemoRole: (role: "user" | "creator" | "admin" | "super_admin") => void;
-  updateUserPoints: (addPoints: number, reason: string) => void;
+  updateUserPoints: (points: number, reason: string) => void;
 }
 
-const DEFAULT_USER_FAIROZ: UserProfile = {
-  clerkUserId: "user_fairoz_01",
-  username: "fairoz",
-  displayName: "Fairoz",
-  avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80",
-  email: "fairoz@donestudio.events",
-  country: "IN",
-  role: "super_admin",
-  points: 15400,
-  level: 13,
-  joinDate: "2026-08-01",
-  isSuspended: false,
-  isBanned: false,
-  stats: {
-    vadamvaliWins: 45,
-    vadamvaliLosses: 3,
-    quizzesTaken: 8,
-    quizHighScore: 950,
-    pookalamsSubmitted: 2,
-    pookalamVotesReceived: 384,
-  },
-};
-
 const AuthContext = createContext<AuthContextType>({
-  user: DEFAULT_USER_FAIROZ,
-  isSignedIn: true,
-  isLoaded: true,
-  isAdmin: true,
-  isSuperAdmin: true,
-  isCreator: true,
-  login: () => {},
-  logout: () => {},
+  user: null,
+  isSignedIn: false,
+  isClerkSignedIn: false,
+  isConvexAuthenticated: false,
+  isLoaded: false,
+  isAdmin: false,
+  isSuperAdmin: false,
+  isCreator: false,
+  canHostEvents: false,
   switchDemoRole: () => {},
   updateUserPoints: () => {},
 });
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(DEFAULT_USER_FAIROZ);
-  const [isLoaded, setIsLoaded] = useState(true);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
+  const { isAuthenticated: convexAuthenticated, isLoading: convexAuthLoading } = useConvexAuth();
+  const profile = useQuery(api.profiles.getCurrentProfile, convexAuthenticated ? {} : "skip");
+  const syncProfile = useMutation(api.profiles.syncProfile);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("done_active_user");
-      if (saved) {
-        try {
-          setUser(JSON.parse(saved));
-        } catch (e) {
-          setUser(DEFAULT_USER_FAIROZ);
-        }
-      } else {
-        setUser(DEFAULT_USER_FAIROZ);
-        localStorage.setItem("done_active_user", JSON.stringify(DEFAULT_USER_FAIROZ));
-      }
-    }
-  }, []);
+    if (!clerkLoaded || !clerkSignedIn || !clerkUser || !convexAuthenticated) return;
+    const userEmail =
+      clerkUser.primaryEmailAddress?.emailAddress ||
+      clerkUser.emailAddresses?.[0]?.emailAddress ||
+      "";
+    const isTargetAdmin = userEmail.toLowerCase() === "fairozfaisal2001@gmail.com";
 
-  const login = (profile: Partial<UserProfile>) => {
-    const fullUser: UserProfile = {
-      clerkUserId: profile.clerkUserId || `user_${Date.now()}`,
-      username: profile.username || "fairoz",
-      displayName: profile.displayName || "Fairoz",
-      avatarUrl: profile.avatarUrl || DEFAULT_USER_FAIROZ.avatarUrl,
-      email: profile.email || "fairoz@donestudio.events",
-      country: profile.country || "IN",
-      role: profile.role || "super_admin",
-      points: profile.points || 15400,
-      level: profile.level || 13,
-      joinDate: profile.joinDate || "2026-08-01",
-      isSuspended: false,
-      isBanned: false,
-      stats: profile.stats || DEFAULT_USER_FAIROZ.stats,
-    };
-    setUser(fullUser);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("done_active_user", JSON.stringify(fullUser));
-    }
-  };
+    void syncProfile({
+      displayName: clerkUser.fullName || clerkUser.username || (isTargetAdmin ? "The Hook" : "D-One Member"),
+      avatarUrl: clerkUser.imageUrl,
+      email: userEmail || undefined,
+      username: clerkUser.username || (isTargetAdmin ? "hook" : undefined),
+    }).catch((error) => console.error("Unable to synchronize the signed-in profile", error));
+  }, [clerkLoaded, clerkUser, convexAuthenticated, clerkSignedIn, syncProfile]);
 
-  const logout = () => {
-    setUser(null);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("done_active_user");
-    }
-  };
-
-  const switchDemoRole = (role: "user" | "creator" | "admin" | "super_admin") => {
-    const base = user || DEFAULT_USER_FAIROZ;
-    const updated = { ...base, role };
-    setUser(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("done_active_user", JSON.stringify(updated));
-    }
-  };
-
-  const updateUserPoints = (addPoints: number, reason: string) => {
-    const base = user || DEFAULT_USER_FAIROZ;
-    const newPoints = base.points + addPoints;
-    const newLevel = Math.max(1, Math.floor(Math.sqrt(newPoints / 100)) + 1);
-    const updated: UserProfile = {
-      ...base,
-      points: newPoints,
-      level: newLevel,
-    };
-    setUser(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("done_active_user", JSON.stringify(updated));
-    }
-  };
-
-  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
-  const isSuperAdmin = user?.role === "super_admin";
-  const isCreator = user?.role === "creator" || user?.role === "super_admin";
+  const user = profile ?? null;
+  const role = user?.role;
+  const canHostEvents = Boolean(user?.canHostEvents || role === "admin" || role === "super_admin" || role === "creator");
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isSignedIn: !!user,
-        isLoaded,
-        isAdmin,
-        isSuperAdmin,
-        isCreator,
-        login,
-        logout,
-        switchDemoRole,
-        updateUserPoints,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      isSignedIn: Boolean(clerkSignedIn && convexAuthenticated),
+      isClerkSignedIn: Boolean(clerkSignedIn),
+      isConvexAuthenticated: Boolean(convexAuthenticated),
+      isLoaded: clerkLoaded && !convexAuthLoading && (!clerkSignedIn || !convexAuthenticated || profile !== undefined),
+      isAdmin: role === "admin" || role === "super_admin",
+      isSuperAdmin: role === "super_admin",
+      isCreator: role === "creator" || role === "super_admin" || canHostEvents,
+      canHostEvents,
+      switchDemoRole: () => console.warn("Demo role switching is disabled; roles are enforced by Convex."),
+      updateUserPoints: () => console.warn("Client-side point awards are disabled; points are awarded by Convex."),
+    }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = () => useContext(AuthContext);

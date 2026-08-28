@@ -1,6 +1,9 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "./profiles";
+import { getAuthUserId, getOrEnsureProfile } from "./profiles";
+import { requireAdmin, requireUser } from "./lib/auth";
+import type { Doc } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 
 // Generate a memorable 6-char room code, e.g. D1-48291
 function generateRoomCode() {
@@ -10,6 +13,35 @@ function generateRoomCode() {
     num += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return `D1-${num}`;
+}
+
+async function requirePlayableActivity(ctx: MutationCtx, eventId: Doc<"matches">["eventId"] | undefined, activitySlug: string, clerkUserId: string) {
+  let resolvedEventId = eventId;
+  if (!resolvedEventId) {
+    const featured = await ctx.db.query("events").withIndex("by_featured", q => q.eq("featured", true)).first();
+    resolvedEventId = featured?._id;
+  }
+  if (!resolvedEventId) {
+    const anyEvent = await ctx.db.query("events").order("desc").first();
+    resolvedEventId = anyEvent?._id;
+  }
+  if (resolvedEventId) {
+    const registration = await ctx.db.query("eventRegistrations").withIndex("by_eventId_and_user", q => q.eq("eventId", resolvedEventId!).eq("clerkUserId", clerkUserId)).first();
+    if (!registration) {
+      await ctx.db.insert("eventRegistrations", {
+        eventId: resolvedEventId,
+        clerkUserId,
+        registeredAt: Date.now(),
+        status: "registered",
+        createdAt: Date.now(),
+      });
+      const event = await ctx.db.get(resolvedEventId);
+      if (event) {
+        await ctx.db.patch(resolvedEventId, { participantCount: (event.participantCount || 0) + 1, updatedAt: Date.now() });
+      }
+    }
+  }
+  return resolvedEventId;
 }
 
 // Get match by room code in real-time
@@ -40,13 +72,9 @@ export const createPrivateRoom = mutation({
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
     if (!clerkUserId) throw new Error("Unauthorized: Please sign in");
+    const resolvedEventId = await requirePlayableActivity(ctx, args.eventId, args.activitySlug, clerkUserId);
 
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-      .first();
-
-    if (!profile) throw new Error("Profile not found");
+    const profile = await getOrEnsureProfile(ctx, clerkUserId);
     if (profile.isSuspended || profile.isBanned) {
       throw new Error("Account suspended");
     }
@@ -55,7 +83,7 @@ export const createPrivateRoom = mutation({
     const now = Date.now();
 
     const matchId = await ctx.db.insert("matches", {
-      eventId: args.eventId,
+      eventId: resolvedEventId,
       activitySlug: args.activitySlug,
       roomCode: roomCode,
       mode: "private",
@@ -89,12 +117,7 @@ export const joinPrivateRoom = mutation({
     const clerkUserId = await getAuthUserId(ctx);
     if (!clerkUserId) throw new Error("Unauthorized: Please sign in");
 
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-      .first();
-
-    if (!profile) throw new Error("Profile not found");
+    const profile = await getOrEnsureProfile(ctx, clerkUserId);
 
     const match = await ctx.db
       .query("matches")
@@ -145,13 +168,9 @@ export const findQuickMatch = mutation({
   handler: async (ctx, args) => {
     const clerkUserId = await getAuthUserId(ctx);
     if (!clerkUserId) throw new Error("Unauthorized: Please sign in");
+    const resolvedEventId = await requirePlayableActivity(ctx, args.eventId, args.activitySlug, clerkUserId);
 
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-      .first();
-
-    if (!profile) throw new Error("Profile not found");
+    const profile = await getOrEnsureProfile(ctx, clerkUserId);
 
     const now = Date.now();
 
@@ -191,7 +210,7 @@ export const findQuickMatch = mutation({
     // Create a new waiting quick match
     const roomCode = generateRoomCode();
     const matchId = await ctx.db.insert("matches", {
-      eventId: args.eventId,
+      eventId: resolvedEventId,
       activitySlug: args.activitySlug,
       roomCode: roomCode,
       mode: "quick",
@@ -216,6 +235,7 @@ export const findQuickMatch = mutation({
   },
 });
 
+
 // Set Player Ready in Lobby
 export const setPlayerReady = mutation({
   args: {
@@ -230,8 +250,8 @@ export const setPlayerReady = mutation({
     if (!match) throw new Error("Match not found");
 
     const now = Date.now();
-    let p1 = { ...match.player1 };
-    let p2 = match.player2 ? { ...match.player2 } : undefined;
+    const p1 = { ...match.player1 };
+    const p2 = match.player2 ? { ...match.player2 } : undefined;
 
     if (p1.clerkUserId === clerkUserId) {
       p1.isReady = args.isReady;
@@ -258,6 +278,27 @@ export const setPlayerReady = mutation({
     });
 
     return true;
+  },
+});
+
+// Start Match from countdown
+export const startMatchNow = mutation({
+  args: { matchId: v.id("matches") },
+  handler: async (ctx, args) => {
+    const { identity } = await requireUser(ctx);
+    const match = await ctx.db.get(args.matchId);
+    if (!match) return;
+    if (match.player1.clerkUserId !== identity.subject && match.player2?.clerkUserId !== identity.subject) {
+      throw new Error("NOT_A_MATCH_PLAYER");
+    }
+
+    if (match.status === "countdown" || match.status === "lobby") {
+      await ctx.db.patch(args.matchId, {
+        status: "in_progress",
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
   },
 });
 
@@ -291,7 +332,7 @@ export const pullRope = mutation({
     const timeSinceLastPull = now - player.lastPullTimestamp;
 
     // Anti-Cheat Check: Maximum 25 pulls per second (40ms interval minimum)
-    let antiCheatFlags = [...match.antiCheatFlags];
+    const antiCheatFlags = [...match.antiCheatFlags];
     let sanitizedPullPower = Math.min(Math.max(args.pullPower, 0.5), 3.0);
 
     if (timeSinceLastPull < 35) {
@@ -314,8 +355,8 @@ export const pullRope = mutation({
     const delta = isPlayer1 ? -sanitizedPullPower : sanitizedPullPower;
     const newPosition = Math.max(-100, Math.min(100, match.ropePosition + delta));
 
-    let updatedP1 = { ...match.player1 };
-    let updatedP2 = { ...match.player2! };
+    const updatedP1 = { ...match.player1 };
+    const updatedP2 = { ...match.player2! };
 
     if (isPlayer1) {
       updatedP1.pulls = (updatedP1.pulls || 0) + 1;
@@ -326,7 +367,7 @@ export const pullRope = mutation({
     }
 
     // Check for Win condition (>= 100 or <= -100)
-    let matchStatus = match.status === "countdown" ? "in_progress" : match.status;
+    let matchStatus: Doc<"matches">["status"] = match.status === "countdown" ? "in_progress" : match.status;
     let winnerId: string | undefined = undefined;
 
     if (newPosition <= -100) {
@@ -348,6 +389,9 @@ export const pullRope = mutation({
 
     if (winnerId) {
       patchData.winner = winnerId;
+      patchData.loser = winnerId === match.player1.clerkUserId ? match.player2!.clerkUserId : match.player1.clerkUserId;
+      patchData.winnerPoints = 100;
+      patchData.loserPoints = 30;
       patchData.endedAt = now;
       const duration = Math.round((now - (match.startedAt || match.createdAt)) / 1000);
       patchData.durationSeconds = duration;
@@ -411,30 +455,18 @@ export const pullRope = mutation({
   },
 });
 
-// Start Match from countdown
-export const startMatchNow = mutation({
-  args: { matchId: v.id("matches") },
-  handler: async (ctx, args) => {
-    const match = await ctx.db.get(args.matchId);
-    if (!match) return;
-
-    if (match.status === "countdown") {
-      await ctx.db.patch(args.matchId, {
-        status: "in_progress",
-        startedAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-    }
-  },
-});
-
 // List match history for a user
 export const listUserMatches = query({
-  args: { clerkUserId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+    const clerkUserId = identity.subject;
     const p1Matches = await ctx.db
       .query("matches")
-      .withIndex("by_player1", (q) => q.eq("player1.clerkUserId", args.clerkUserId))
+      .withIndex("by_player1", (q) => q.eq("player1.clerkUserId", clerkUserId))
       .order("desc")
       .take(20);
 
@@ -445,7 +477,7 @@ export const listUserMatches = query({
       .take(50);
 
     const p2Matches = allCompleted.filter(
-      (m) => m.player2 && m.player2.clerkUserId === args.clerkUserId
+      (m) => m.player2 && m.player2.clerkUserId === clerkUserId
     );
 
     const combined = [...p1Matches, ...p2Matches].sort((a, b) => b.createdAt - a.createdAt);
@@ -457,6 +489,7 @@ export const listUserMatches = query({
 export const listLiveMatches = query({
   args: {},
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     const live = await ctx.db
       .query("matches")
       .filter((q) =>
