@@ -12,11 +12,14 @@ export default function EventsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedMode, setSelectedMode] = useState("online");
 
   const events = useQuery(api.events.listEvents, {
     category: selectedCategory === "all" ? undefined : selectedCategory,
     status: selectedStatus === "all" ? undefined : selectedStatus,
+    mode: selectedMode === "all" ? undefined : (selectedMode as "online" | "offline" | "hybrid"),
   });
+  const onlineSections = useQuery(api.events.listOnlineSections, {});
   const filteredEvents = (events ?? []).filter((e: Doc<"events">) => {
     const matchesSearch =
       e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -71,6 +74,17 @@ export default function EventsPage() {
             </select>
 
             <select
+              value={selectedMode}
+              onChange={(e) => setSelectedMode(e.target.value)}
+              className="px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-slate-200 bg-slate-900"
+            >
+              <option value="online">Online Events</option>
+              <option value="hybrid">Hybrid Events</option>
+              <option value="offline">Offline Events</option>
+              <option value="all">All Modes</option>
+            </select>
+
+            <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-slate-200 bg-slate-900"
@@ -79,10 +93,28 @@ export default function EventsPage() {
               <option value="live">Live Now</option>
               <option value="registration_open">Registration Open</option>
               <option value="scheduled">Coming Soon</option>
+              <option value="registration_closed">Registration Closed</option>
+              <option value="completed">Past Events</option>
             </select>
           </div>
         </div>
       </div>
+
+      {onlineSections && selectedMode === "online" && selectedStatus === "all" && !searchQuery && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            ["Live Events", onlineSections.live.length, "text-emerald-400"],
+            ["Registration Open", onlineSections.registrationOpen.length, "text-amber-400"],
+            ["Upcoming Events", onlineSections.upcoming.length, "text-sky-400"],
+            ["Past Events", onlineSections.past.length, "text-slate-300"],
+          ].map(([label, count, color]) => (
+            <div key={label} className="p-4 rounded-2xl glass-panel border border-slate-800">
+              <div className="text-[11px] font-bold uppercase text-slate-400">{label}</div>
+              <div className={`text-2xl font-black ${color}`}>{count}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Events Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">

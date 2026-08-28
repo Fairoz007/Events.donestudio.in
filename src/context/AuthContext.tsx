@@ -16,8 +16,9 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isCreator: boolean;
+  isStreamer: boolean;
   canHostEvents: boolean;
-  switchDemoRole: (role: "user" | "creator" | "admin" | "super_admin") => void;
+  switchDemoRole: (role: "user" | "streamer" | "creator" | "admin" | "super_admin") => void;
   updateUserPoints: (points: number, reason: string) => void;
 }
 
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   isSuperAdmin: false,
   isCreator: false,
+  isStreamer: false,
   canHostEvents: false,
   switchDemoRole: () => {},
   updateUserPoints: () => {},
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isSuperAdmin: role === "super_admin",
       isCreator: role === "creator" || role === "super_admin" || canHostEvents,
       canHostEvents,
+      isStreamer: role === "streamer" || role === "admin" || role === "super_admin",
       switchDemoRole: () => console.warn("Demo role switching is disabled; roles are enforced by Convex."),
       updateUserPoints: () => console.warn("Client-side point awards are disabled; points are awarded by Convex."),
     }}>
