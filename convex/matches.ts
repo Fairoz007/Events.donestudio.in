@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId, getOrEnsureProfile } from "./profiles";
@@ -33,8 +33,6 @@ async function requirePlayableActivity(ctx: MutationCtx, eventId: Doc<"matches">
         eventId: resolvedEventId,
         clerkUserId,
         registeredAt: Date.now(),
-        status: "registered",
-        createdAt: Date.now(),
       });
       const event = await ctx.db.get(resolvedEventId);
       if (event) {
@@ -368,7 +366,7 @@ export const pullRope = mutation({
     }
 
     // Check for Win condition (>= 100 or <= -100)
-    let matchStatus: Doc<"matches">["status"] = match.status === "countdown" ? "in_progress" : match.status;
+    let matchStatus: "waiting" | "lobby" | "countdown" | "in_progress" | "completed" | "cancelled" | "disconnected" = match.status === "countdown" ? "in_progress" : match.status;
     let winnerId: string | undefined = undefined;
 
     if (newPosition <= -100) {
@@ -390,9 +388,6 @@ export const pullRope = mutation({
 
     if (winnerId) {
       patchData.winner = winnerId;
-      patchData.loser = winnerId === match.player1.clerkUserId ? match.player2!.clerkUserId : match.player1.clerkUserId;
-      patchData.winnerPoints = 100;
-      patchData.loserPoints = 30;
       patchData.endedAt = now;
       const duration = Math.round((now - (match.startedAt || match.createdAt)) / 1000);
       patchData.durationSeconds = duration;

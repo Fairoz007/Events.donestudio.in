@@ -1,7 +1,9 @@
-// @ts-nocheck
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+// "svix" is listed in package.json dependencies and marked as an
+// external Node module.  Convex bundles server functions for V8, so we
+// declare the import with `"use node"` semantics via the action handler.
 import { Webhook } from "svix";
 
 const http = httpRouter();
