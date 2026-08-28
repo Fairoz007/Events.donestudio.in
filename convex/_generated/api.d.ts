@@ -19,6 +19,7 @@ import type * as leaderboards from "../leaderboards.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as matches from "../matches.js";
 import type * as notifications from "../notifications.js";
+import type * as onam from "../onam.js";
 import type * as pookalam from "../pookalam.js";
 import type * as profiles from "../profiles.js";
 import type * as quizzes from "../quizzes.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   matches: typeof matches;
   notifications: typeof notifications;
+  onam: typeof onam;
   pookalam: typeof pookalam;
   profiles: typeof profiles;
   quizzes: typeof quizzes;

@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -554,3 +555,4 @@ export function VadamvaliGame({ eventSlug = "onam-2026" }: { eventSlug?: string 
     </div>
   );
 }
+

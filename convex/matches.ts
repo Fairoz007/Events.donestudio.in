@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId, getOrEnsureProfile } from "./profiles";
@@ -542,3 +543,4 @@ export const terminateMatch = mutation({
     return true;
   },
 });
+

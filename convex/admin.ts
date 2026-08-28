@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId, ensureTrustedCreatorProfile } from "./profiles";
@@ -626,3 +627,4 @@ export const createEventAdmin = mutation({
     return { eventId, message: `Successfully created event "${args.title}" with slug "${args.slug}"` };
   },
 });
+

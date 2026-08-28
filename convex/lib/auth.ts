@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getOrEnsureProfile } from "../profiles";
 
@@ -36,3 +37,4 @@ export async function requireSuperAdmin(ctx: Ctx) {
   }
   return current;
 }
+

@@ -13,13 +13,11 @@ export default defineSchema({
     role: v.union(
       v.literal("visitor"),
       v.literal("user"),
-      v.literal("streamer"),
       v.literal("creator"),
       v.literal("moderator"),
       v.literal("admin"),
       v.literal("super_admin")
     ),
-    canHostEvents: v.optional(v.boolean()),
     points: v.number(),
     level: v.number(),
     joinDate: v.string(),
@@ -39,10 +37,9 @@ export default defineSchema({
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_username", ["username"])
     .index("by_role", ["role"])
-    .index("by_points", ["points"])
-    .index("by_email", ["email"]),
+    .index("by_points", ["points"]),
 
-  // Dedicated ONAM 2026 event. Activities hang off this single event.
+  // ONAM 2026 event
   events: defineTable({
     title: v.string(),
     slug: v.string(),
@@ -54,31 +51,12 @@ export default defineSchema({
     endDate: v.string(),
     registrationStartDate: v.string(),
     registrationEndDate: v.string(),
-    timezone: v.optional(v.string()),
-    registrationOpensAt: v.optional(v.number()),
-    registrationClosesAt: v.optional(v.number()),
-    mode: v.optional(v.union(v.literal("online"), v.literal("offline"), v.literal("hybrid"))),
-    eventType: v.optional(
-      v.union(
-        v.literal("tournament"),
-        v.literal("multiplayer_game"),
-        v.literal("quiz"),
-        v.literal("design_competition"),
-        v.literal("voting_competition"),
-        v.literal("creator_event"),
-        v.literal("live_event"),
-        v.literal("giveaway"),
-        v.literal("community_event")
-      )
-    ),
     status: v.union(
       v.literal("draft"),
       v.literal("scheduled"),
       v.literal("registration_open"),
       v.literal("registration_closed"),
-      v.literal("ready"),
       v.literal("live"),
-      v.literal("paused"),
       v.literal("completed"),
       v.literal("cancelled"),
       v.literal("archived")
@@ -117,27 +95,7 @@ export default defineSchema({
       })
     ),
     organizer: v.string(),
-    createdByUserId: v.optional(v.string()),
-    hostUserId: v.optional(v.string()),
-    hostRole: v.optional(
-      v.union(
-        v.literal("super_admin"),
-        v.literal("admin"),
-        v.literal("user"),
-        v.literal("streamer"),
-        v.literal("creator"),
-        v.literal("moderator")
-      )
-    ),
-    organizationName: v.optional(v.string()),
-    isOfficial: v.optional(v.boolean()),
-    isPublished: v.optional(v.boolean()),
     participantCount: v.number(),
-    activeParticipantCount: v.optional(v.number()),
-    pausedAt: v.optional(v.number()),
-    startedAt: v.optional(v.number()),
-    completedAt: v.optional(v.number()),
-    cancelledAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -161,12 +119,7 @@ export default defineSchema({
     bannerUrl: v.string(),
     status: v.union(
       v.literal("upcoming"),
-      v.literal("registration_open"),
-      v.literal("registration_closed"),
       v.literal("live"),
-      v.literal("paused"),
-      v.literal("completed"),
-      v.literal("cancelled"),
       v.literal("closed"),
       v.literal("archived")
     ),
@@ -175,20 +128,10 @@ export default defineSchema({
     participantCount: v.number(),
     startTime: v.optional(v.string()),
     endTime: v.optional(v.string()),
-    registrationStartTime: v.optional(v.number()),
-    registrationCloseTime: v.optional(v.number()),
-    scheduledStartTime: v.optional(v.number()),
-    expectedEndTime: v.optional(v.number()),
-    startedAt: v.optional(v.number()),
-    pausedAt: v.optional(v.number()),
-    completedAt: v.optional(v.number()),
-    votingStatus: v.optional(v.union(v.literal("closed"), v.literal("open"))),
-    submissionsOpen: v.optional(v.boolean()),
     order: v.number(),
     config: v.optional(v.any()),
   })
     .index("by_eventId", ["eventId"])
-    .index("by_eventId_and_slug", ["eventId", "slug"])
     .index("by_slug", ["slug"])
     .index("by_type", ["type"]),
 
@@ -196,10 +139,8 @@ export default defineSchema({
   eventRegistrations: defineTable({
     eventId: v.id("events"),
     clerkUserId: v.string(),
+    registrationRef: v.optional(v.string()),
     registeredAt: v.number(),
-    status: v.optional(v.union(v.literal("registered"), v.literal("cancelled"), v.literal("checked_in"))),
-    activityIds: v.optional(v.array(v.id("eventActivities"))),
-    createdAt: v.optional(v.number()),
   })
     .index("by_eventId_and_user", ["eventId", "clerkUserId"])
     .index("by_user", ["clerkUserId"])
@@ -207,173 +148,141 @@ export default defineSchema({
 
   activityRegistrations: defineTable({
     eventId: v.id("events"),
-    activityId: v.id("eventActivities"),
+    activitySlug: v.union(v.literal("vadamvali"), v.literal("pookalam"), v.literal("quiz")),
     clerkUserId: v.string(),
-    status: v.union(v.literal("registered"), v.literal("cancelled"), v.literal("disqualified")),
-    seed: v.optional(v.number()),
-    rankingPoints: v.optional(v.number()),
+    registrationRef: v.string(),
+    status: v.union(v.literal("registered"), v.literal("cancelled"), v.literal("waitlisted")),
     registeredAt: v.number(),
-    updatedAt: v.number(),
   })
-    .index("by_activity_and_user", ["activityId", "clerkUserId"])
-    .index("by_activity_and_status", ["activityId", "status"])
-    .index("by_event_and_user", ["eventId", "clerkUserId"]),
+    .index("by_event_and_activity", ["eventId", "activitySlug"])
+    .index("by_event_activity_and_user", ["eventId", "activitySlug", "clerkUserId"])
+    .index("by_user", ["clerkUserId"]),
 
-  streamerApplications: defineTable({
-    clerkUserId: v.string(),
-    name: v.string(),
-    username: v.string(),
-    platform: v.string(),
-    channelUrl: v.string(),
-    followerCount: v.number(),
-    country: v.string(),
-    description: v.string(),
-    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"), v.literal("suspended")),
-    reviewedBy: v.optional(v.string()),
-    reviewedAt: v.optional(v.number()),
-    adminNotes: v.optional(v.string()),
-    submittedAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_clerkUserId", ["clerkUserId"])
-    .index("by_status", ["status"]),
-
-  tournaments: defineTable({
+  onamSettings: defineTable({
     eventId: v.id("events"),
-    activityId: v.id("eventActivities"),
-    name: v.string(),
-    status: v.union(
-      v.literal("registration_open"),
-      v.literal("registration_closed"),
-      v.literal("generated"),
-      v.literal("live"),
-      v.literal("completed"),
-      v.literal("cancelled")
-    ),
-    seedingMethod: v.union(v.literal("random"), v.literal("ranking"), v.literal("manual")),
-    bracketSize: v.optional(v.number()),
-    winsRequired: v.number(),
-    maxGames: v.number(),
-    thirdPlaceEnabled: v.boolean(),
-    tournamentStartAt: v.optional(v.number()),
-    matchDurationMinutes: v.number(),
-    intervalMinutes: v.number(),
-    simultaneousMatches: v.number(),
-    checkInWindowMinutes: v.optional(v.number()),
-    currentMatchId: v.optional(v.id("tournamentMatches")),
-    generatedAt: v.optional(v.number()),
-    winnerClerkUserId: v.optional(v.string()),
-    createdAt: v.number(),
+    timezone: v.string(),
+    registrationOpensAt: v.number(),
+    registrationClosesAt: v.number(),
+    pookalamSubmissionOpensAt: v.number(),
+    pookalamSubmissionClosesAt: v.number(),
+    pookalamVotingOpensAt: v.number(),
+    pookalamVotingClosesAt: v.number(),
+    pookalamLiveVoteCounts: v.boolean(),
+    pookalamVoteChangesAllowed: v.boolean(),
+    quizStatus: v.union(v.literal("registration"), v.literal("lobby"), v.literal("live"), v.literal("paused"), v.literal("finished")),
+    currentActivity: v.optional(v.string()),
+    nextActivity: v.optional(v.string()),
     updatedAt: v.number(),
-  })
-    .index("by_activityId", ["activityId"])
-    .index("by_eventId", ["eventId"])
-    .index("by_status", ["status"]),
+  }).index("by_eventId", ["eventId"]),
 
-  tournamentParticipants: defineTable({
-    tournamentId: v.id("tournaments"),
-    activityRegistrationId: v.id("activityRegistrations"),
+  eventHosts: defineTable({
+    eventId: v.id("events"),
+    clerkUserId: v.string(),
+    permission: v.union(v.literal("streamer"), v.literal("event_host")),
+    grantedBy: v.string(),
+    grantedAt: v.number(),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_event_and_user", ["eventId", "clerkUserId"])
+    .index("by_event_and_permission", ["eventId", "permission"]),
+
+  vadamvaliTournaments: defineTable({
+    eventId: v.id("events"),
+    status: v.union(v.literal("registration"), v.literal("fixture_ready"), v.literal("live"), v.literal("completed")),
+    format: v.literal("best_of_3"),
+    seedingMode: v.union(v.literal("random"), v.literal("ranking"), v.literal("manual")),
+    maxParticipants: v.optional(v.number()),
+    tournamentStartsAt: v.number(),
+    averageMatchDurationMinutes: v.number(),
+    transitionMinutes: v.number(),
+    currentMatchId: v.optional(v.id("tournamentMatches")),
+    championClerkUserId: v.optional(v.string()),
+    generatedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_eventId", ["eventId"]),
+
+  vadamvaliParticipants: defineTable({
+    eventId: v.id("events"),
+    tournamentId: v.optional(v.id("vadamvaliTournaments")),
     clerkUserId: v.string(),
     displayName: v.string(),
     avatarUrl: v.string(),
-    seed: v.number(),
-    status: v.union(v.literal("active"), v.literal("eliminated"), v.literal("disqualified"), v.literal("winner")),
-    eliminatedRound: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    seed: v.optional(v.number()),
+    eliminated: v.boolean(),
+    registeredAt: v.number(),
   })
-    .index("by_tournamentId", ["tournamentId"])
-    .index("by_tournament_and_user", ["tournamentId", "clerkUserId"])
+    .index("by_event_and_user", ["eventId", "clerkUserId"])
     .index("by_tournament_and_seed", ["tournamentId", "seed"]),
 
   tournamentRounds: defineTable({
-    tournamentId: v.id("tournaments"),
+    tournamentId: v.id("vadamvaliTournaments"),
+    eventId: v.id("events"),
     roundNumber: v.number(),
     name: v.string(),
-    entrantsCount: v.number(),
-    status: v.union(v.literal("waiting"), v.literal("ready"), v.literal("live"), v.literal("completed")),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    size: v.number(),
+    status: v.union(v.literal("waiting"), v.literal("active"), v.literal("completed")),
   })
-    .index("by_tournament_and_round", ["tournamentId", "roundNumber"])
-    .index("by_tournamentId", ["tournamentId"]),
+    .index("by_tournament", ["tournamentId"])
+    .index("by_tournament_and_round", ["tournamentId", "roundNumber"]),
 
   tournamentMatches: defineTable({
-    tournamentId: v.id("tournaments"),
+    tournamentId: v.id("vadamvaliTournaments"),
+    eventId: v.id("events"),
     roundId: v.id("tournamentRounds"),
     roundNumber: v.number(),
     matchNumber: v.number(),
-    slotIndex: v.number(),
+    queuePosition: v.number(),
     player1ClerkUserId: v.optional(v.string()),
+    player1Name: v.optional(v.string()),
     player2ClerkUserId: v.optional(v.string()),
-    player1DisplayName: v.optional(v.string()),
-    player2DisplayName: v.optional(v.string()),
-    player1AvatarUrl: v.optional(v.string()),
-    player2AvatarUrl: v.optional(v.string()),
-    player1Ready: v.boolean(),
-    player2Ready: v.boolean(),
-    player1CheckedInAt: v.optional(v.number()),
-    player2CheckedInAt: v.optional(v.number()),
-    player1GameWins: v.number(),
-    player2GameWins: v.number(),
-    winnerClerkUserId: v.optional(v.string()),
-    loserClerkUserId: v.optional(v.string()),
-    matchResultType: v.optional(v.union(v.literal("played"), v.literal("walkover"), v.literal("bye"), v.literal("admin_review"))),
-    resultReason: v.optional(v.string()),
-    nextMatchId: v.optional(v.id("tournamentMatches")),
-    nextSlot: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+    player2Name: v.optional(v.string()),
     status: v.union(
       v.literal("scheduled"),
       v.literal("upcoming"),
       v.literal("ready_for_checkin"),
-      v.literal("waiting"),
+      v.literal("waiting_for_players"),
       v.literal("ready"),
       v.literal("live"),
       v.literal("completed"),
       v.literal("walkover"),
       v.literal("no_show"),
-      v.literal("admin_review"),
-      v.literal("forfeit"),
-      v.literal("disconnected"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
+      v.literal("admin_review")
     ),
-    scheduledAt: v.optional(v.number()),
     expectedStartAt: v.optional(v.number()),
     checkInOpenedAt: v.optional(v.number()),
-    checkInDeadlineAt: v.optional(v.number()),
+    checkInClosesAt: v.optional(v.number()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
-    createdAt: v.number(),
+    winnerClerkUserId: v.optional(v.string()),
+    loserClerkUserId: v.optional(v.string()),
+    matchResultType: v.optional(v.union(v.literal("played"), v.literal("walkover"), v.literal("bye"), v.literal("no_show"))),
+    reason: v.optional(v.string()),
+    nextMatchId: v.optional(v.id("tournamentMatches")),
+    nextSlot: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+    player1Wins: v.number(),
+    player2Wins: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_tournament_and_round", ["tournamentId", "roundNumber"])
+    .index("by_tournament_and_queue", ["tournamentId", "queuePosition"])
     .index("by_tournament_and_status", ["tournamentId", "status"])
+    .index("by_event_and_status", ["eventId", "status"])
     .index("by_player1", ["player1ClerkUserId"])
-    .index("by_player2", ["player2ClerkUserId"])
-    .index("by_scheduledAt", ["scheduledAt"]),
+    .index("by_player2", ["player2ClerkUserId"]),
 
   matchGames: defineTable({
-    tournamentMatchId: v.id("tournamentMatches"),
+    matchId: v.id("tournamentMatches"),
     gameNumber: v.number(),
-    status: v.union(v.literal("scheduled"), v.literal("live"), v.literal("completed"), v.literal("cancelled")),
-    ropePosition: v.number(),
-    winnerClerkUserId: v.optional(v.string()),
-    startedAt: v.optional(v.number()),
-    completedAt: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_tournamentMatchId", ["tournamentMatchId"])
-    .index("by_match_and_game", ["tournamentMatchId", "gameNumber"]),
+    winnerClerkUserId: v.string(),
+    recordedBy: v.string(),
+    recordedAt: v.number(),
+  }).index("by_match", ["matchId"]),
 
-  matchSpectators: defineTable({
-    tournamentMatchId: v.id("tournamentMatches"),
+  matchCheckIns: defineTable({
+    matchId: v.id("tournamentMatches"),
     clerkUserId: v.string(),
-    joinedAt: v.number(),
-    lastSeenAt: v.number(),
-  })
-    .index("by_match_and_user", ["tournamentMatchId", "clerkUserId"])
-    .index("by_tournamentMatchId", ["tournamentMatchId"]),
+    checkedInAt: v.number(),
+  }).index("by_match_and_user", ["matchId", "clerkUserId"]).index("by_match", ["matchId"]),
 
   // Creator Applications
   creatorApplications: defineTable({
@@ -392,14 +301,14 @@ export default defineSchema({
     channelUrl: v.string(),
     followerCount: v.number(),
     country: v.string(),
-    profileImage: v.optional(v.union(v.string(), v.null())),
+    profileImage: v.string(),
     description: v.string(),
     whyJoin: v.string(),
     socialLinks: v.object({
-      youtube: v.optional(v.union(v.string(), v.null())),
-      twitter: v.optional(v.union(v.string(), v.null())),
-      instagram: v.optional(v.union(v.string(), v.null())),
-      discord: v.optional(v.union(v.string(), v.null())),
+      youtube: v.optional(v.string()),
+      twitter: v.optional(v.string()),
+      instagram: v.optional(v.string()),
+      discord: v.optional(v.string()),
     }),
     status: v.union(
       v.literal("pending"),
@@ -415,7 +324,6 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_clerkUserId", ["clerkUserId"])
-    .index("by_email", ["email"])
     .index("by_status", ["status"])
     .index("by_createdAt", ["createdAt"]),
 
@@ -435,9 +343,7 @@ export default defineSchema({
     featured: v.boolean(),
     eventsParticipated: v.number(),
     achievements: v.array(v.string()),
-    canHostEvents: v.optional(v.boolean()),
     createdAt: v.number(),
-    updatedAt: v.optional(v.number()),
   })
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_username", ["username"])
@@ -482,11 +388,6 @@ export default defineSchema({
     ),
     ropePosition: v.number(), // -100 (Player 1 win) to +100 (Player 2 win), 0 is center
     winner: v.optional(v.string()), // clerkUserId of winner
-    loser: v.optional(v.string()),
-    winnerPoints: v.optional(v.number()),
-    loserPoints: v.optional(v.number()),
-    scheduledAt: v.optional(v.number()),
-    expected: v.optional(v.boolean()),
     durationSeconds: v.optional(v.number()),
     startedAt: v.optional(v.number()),
     endedAt: v.optional(v.number()),
@@ -497,8 +398,7 @@ export default defineSchema({
     .index("by_roomCode", ["roomCode"])
     .index("by_status", ["status"])
     .index("by_player1", ["player1.clerkUserId"])
-    .index("by_createdAt", ["createdAt"])
-    .index("by_eventId_and_status", ["eventId", "status"]),
+    .index("by_createdAt", ["createdAt"]),
 
   // Matchmaking Queue
   matchmakingQueue: defineTable({
@@ -520,8 +420,6 @@ export default defineSchema({
     templateId: v.optional(v.string()),
     isSubmitted: v.boolean(),
     isDraft: v.boolean(),
-    submittedAt: v.optional(v.number()),
-    submissionStatus: v.optional(v.union(v.literal("draft"), v.literal("submitted"), v.literal("approved"), v.literal("rejected"), v.literal("featured"), v.literal("winner"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -585,19 +483,11 @@ export default defineSchema({
     speedBonusMax: v.number(),
     status: v.union(
       v.literal("draft"),
-      v.literal("scheduled"),
-      v.literal("paused"),
       v.literal("live"),
       v.literal("ended"),
       v.literal("archived")
     ),
     createdAt: v.number(),
-    registrationStartTime: v.optional(v.number()),
-    registrationCloseTime: v.optional(v.number()),
-    scheduledStartTime: v.optional(v.number()),
-    expectedEndTime: v.optional(v.number()),
-    startedAt: v.optional(v.number()),
-    endedAt: v.optional(v.number()),
   })
     .index("by_eventId", ["eventId"])
     .index("by_slug", ["slug"]),
@@ -638,23 +528,9 @@ export default defineSchema({
     isCompleted: v.boolean(),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
-    questionStartedAt: v.optional(v.number()),
-    correctAnswers: v.optional(v.number()),
-    totalResponseTimeMs: v.optional(v.number()),
   })
     .index("by_quiz_and_user", ["quizId", "clerkUserId"])
     .index("by_score", ["score"]),
-
-  eventSchedule: defineTable({
-    eventId: v.id("events"),
-    activityId: v.optional(v.id("eventActivities")),
-    title: v.string(),
-    scheduledAt: v.number(),
-    kind: v.union(v.literal("registration"), v.literal("activity"), v.literal("match"), v.literal("voting"), v.literal("announcement")),
-    status: v.union(v.literal("scheduled"), v.literal("live"), v.literal("completed"), v.literal("cancelled")),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }).index("by_eventId_and_scheduledAt", ["eventId", "scheduledAt"]),
 
   // Leaderboards
   leaderboards: defineTable({
@@ -719,11 +595,6 @@ export default defineSchema({
       v.literal("pookalam_vote"),
       v.literal("pookalam_winner"),
       v.literal("event_announcement"),
-      v.literal("registration"),
-      v.literal("fixture"),
-      v.literal("match_ready"),
-      v.literal("walkover"),
-      v.literal("quiz"),
       v.literal("system")
     ),
     link: v.optional(v.string()),

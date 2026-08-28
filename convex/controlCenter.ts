@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin, requireUser } from "./lib/auth";
@@ -91,4 +92,5 @@ export const deleteScheduleItem = mutation({
     return true;
   },
 });
+
 

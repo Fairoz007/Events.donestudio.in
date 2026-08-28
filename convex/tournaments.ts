@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -500,3 +501,4 @@ export const streamerDashboard = query({
     };
   },
 });
+

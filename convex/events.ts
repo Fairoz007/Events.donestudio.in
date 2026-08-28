@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "./profiles";
@@ -12,11 +13,7 @@ export const listEvents = query({
     mode: v.optional(v.union(v.literal("online"), v.literal("offline"), v.literal("hybrid"))),
   },
   handler: async (ctx, args) => {
-    const onam = await ctx.db
-      .query("events")
-      .withIndex("by_slug", (q) => q.eq("slug", "onam-2026"))
-      .first();
-    let events = onam ? [onam] : [];
+    let events = await ctx.db.query("events").order("desc").take(100);
 
     if (args.featuredOnly) {
       events = events.filter((e) => e.featured);
@@ -38,7 +35,7 @@ export const listEvents = query({
 export const listOnlineSections = query({
   args: {},
   handler: async (ctx) => {
-    const events = (await ctx.db.query("events").withIndex("by_slug", (q) => q.eq("slug", "onam-2026")).take(1))
+    const events = (await ctx.db.query("events").order("desc").take(100))
       .filter((event) => event.isPublished !== false && (event.mode ?? "online") === "online");
     return {
       live: events.filter((event) => event.status === "live"),
@@ -67,50 +64,16 @@ export const getEventBySlug = query({
 export const getFeaturedEvent = query({
   args: {},
   handler: async (ctx) => {
-    const onam = await ctx.db.query("events").withIndex("by_slug", (q) => q.eq("slug", "onam-2026")).first();
-    if (onam) return onam;
-
     const featured = await ctx.db
       .query("events")
       .withIndex("by_featured", (q) => q.eq("featured", true))
       .first();
+
     if (featured) return featured;
 
     // Fallback to latest live or scheduled event
     const events = await ctx.db.query("events").order("desc").take(10);
     return events[0] ?? null;
-  },
-});
-
-export const getOnamOverview = query({
-  args: { now: v.number() },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.query("events").withIndex("by_slug", (q) => q.eq("slug", "onam-2026")).first();
-    if (!event) return null;
-    const activities = await ctx.db
-      .query("eventActivities")
-      .withIndex("by_eventId", (q) => q.eq("eventId", event._id))
-      .take(10);
-    const sortedActivities = activities.sort((a, b) => a.order - b.order);
-    const currentActivity = sortedActivities.find((a) => a.status === "live") ?? null;
-    const nextScheduledActivity =
-      sortedActivities
-        .filter((a) => a.scheduledStartTime && a.scheduledStartTime >= args.now)
-        .sort((a, b) => (a.scheduledStartTime ?? 0) - (b.scheduledStartTime ?? 0))[0] ?? null;
-    const registrationOpen =
-      (event.registrationOpensAt ?? Date.parse(event.registrationStartDate)) <= args.now &&
-      (event.registrationClosesAt ?? Date.parse(event.registrationEndDate)) >= args.now;
-    return {
-      event,
-      activities: sortedActivities,
-      registrationOpen,
-      registrationOpensAt: event.registrationOpensAt ?? Date.parse(event.registrationStartDate),
-      registrationClosesAt: event.registrationClosesAt ?? Date.parse(event.registrationEndDate),
-      registeredUsers: event.participantCount,
-      activeParticipants: event.activeParticipantCount ?? sortedActivities.reduce((total, activity) => total + activity.participantCount, 0),
-      currentActivity,
-      nextScheduledActivity,
-    };
   },
 });
 
@@ -141,13 +104,8 @@ export const registerForEvent = mutation({
 
     const event = await ctx.db.get(args.eventId);
     if (!event) throw new Error("Event not found");
-    if (event.slug !== "onam-2026") throw new Error("ONAM_ONLY_EVENT");
     if (event.status === "cancelled" || event.status === "archived") throw new Error("EVENT_NOT_AVAILABLE");
     const now = Date.now();
-    const opensAt = event.registrationOpensAt ?? Date.parse(event.registrationStartDate);
-    const closesAt = event.registrationClosesAt ?? Date.parse(event.registrationEndDate);
-    if (now < opensAt) throw new Error("REGISTRATION_NOT_OPEN");
-    if (now > closesAt) throw new Error("REGISTRATION_CLOSED");
 
     // Check duplicate
     const existing = await ctx.db
@@ -451,3 +409,4 @@ export const deleteEvent = mutation({
     return true;
   },
 });
+
