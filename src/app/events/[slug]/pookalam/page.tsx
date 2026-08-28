@@ -29,7 +29,7 @@ export default function PookalamPage() {
           </Link>
         ))}
       </div>
-      <PookalamCanvas />
+      <PookalamCanvas eventSlug={slug} />
     </div>
   );
 }

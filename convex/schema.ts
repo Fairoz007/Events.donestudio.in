@@ -120,6 +120,8 @@ export default defineSchema({
       v.union(
         v.literal("super_admin"),
         v.literal("admin"),
+        v.literal("user"),
+        v.literal("streamer"),
         v.literal("creator"),
         v.literal("moderator")
       )
@@ -182,6 +184,7 @@ export default defineSchema({
     config: v.optional(v.any()),
   })
     .index("by_eventId", ["eventId"])
+    .index("by_eventId_and_slug", ["eventId", "slug"])
     .index("by_slug", ["slug"])
     .index("by_type", ["type"]),
 

@@ -26,16 +26,7 @@ export async function requireAdmin(ctx: Ctx) {
 }
 
 export async function requireEventHost(ctx: Ctx) {
-  const current = await requireUser(ctx);
-  if (
-    current.profile.role !== "super_admin" &&
-    current.profile.role !== "admin" &&
-    !current.profile.canHostEvents &&
-    current.profile.role !== "creator"
-  ) {
-    throw new Error("EVENT_HOST_PERMISSION_REQUIRED");
-  }
-  return current;
+  return await requireUser(ctx);
 }
 
 export async function requireSuperAdmin(ctx: Ctx) {

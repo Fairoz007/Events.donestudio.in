@@ -225,7 +225,7 @@ function getStarterElements(templateId: string): CanvasElement[] {
   return [];
 }
 
-export function PookalamCanvas() {
+export function PookalamCanvas({ eventSlug = "onam-2026" }: { eventSlug?: string }) {
   const { isSignedIn } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -399,8 +399,8 @@ export function PookalamCanvas() {
     ctx.stroke();
   }, [elements]);
 
-  const featuredEvent = useQuery(api.events.getFeaturedEvent);
-  const eventId = featuredEvent?._id;
+  const event = useQuery(api.events.getEventBySlug, { slug: eventSlug });
+  const eventId = event?._id;
   const userDraft = useQuery(api.pookalam.getUserDraft, eventId && isSignedIn ? { eventId } : "skip");
 
   const saveDraftMutation = useMutation(api.pookalam.saveDraft);
@@ -488,15 +488,15 @@ export function PookalamCanvas() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <Link
-          href="/events/onam-2026"
+          href={`/events/${eventSlug}`}
           onClick={() => soundFx.playClick()}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Onam 2026 Hub
+          <ArrowLeft className="w-4 h-4" /> Back to {event?.title ?? "Event"} Hub
         </Link>
         <div className="flex items-center gap-3">
           <Link
-            href="/events/onam-2026/pookalam/gallery"
+            href={`/events/${eventSlug}/pookalam/gallery`}
             onClick={() => soundFx.playClick()}
             className="px-4 py-2 rounded-xl text-xs font-bold glass-panel border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 flex items-center gap-1.5 transition-all"
           >
@@ -683,10 +683,10 @@ export function PookalamCanvas() {
               <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500 text-emerald-200 text-xs flex items-center justify-between gap-2 animate-in fade-in">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Your Pookalam &ldquo;{designTitle}&rdquo; is entered into Onam 2026 public voting!</span>
+                  <span>Your Pookalam &ldquo;{designTitle}&rdquo; is entered into {event?.title ?? "this event"} public voting!</span>
                 </div>
                 <Link
-                  href="/events/onam-2026/pookalam/gallery"
+                  href={`/events/${eventSlug}/pookalam/gallery`}
                   onClick={() => soundFx.playClick()}
                   className="font-bold text-amber-300 underline shrink-0"
                 >

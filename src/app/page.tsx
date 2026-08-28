@@ -4,6 +4,7 @@ import { WhyJoinSection } from "@/components/home/WhyJoinSection";
 import { PlatformStatsSection } from "@/components/home/PlatformStatsSection";
 import { CreatorSpotlightSection } from "@/components/home/CreatorSpotlightSection";
 import { FloralParticles } from "@/components/home/FloralParticles";
+import { ActivitiesShowcase } from "@/components/home/ActivitiesShowcase";
 
 export default function HomePage() {
   return (
@@ -17,13 +18,16 @@ export default function HomePage() {
       {/* 2. Upcoming Events Grid with Badges & Avatars (Image 3) */}
       <UpcomingEventsSection />
 
-      {/* 3. Why Join D-One Studio Events (Image 3) */}
+      {/* 3. Featured Event Activities */}
+      <ActivitiesShowcase />
+
+      {/* 4. Why Join D-One Studio Events (Image 3) */}
       <WhyJoinSection />
 
-      {/* 4. Creator Spotlight Hub */}
+      {/* 5. Creator Spotlight Hub */}
       <CreatorSpotlightSection />
 
-      {/* 5. Platform Live Real-Time Stats */}
+      {/* 6. Platform Live Real-Time Stats */}
       <PlatformStatsSection />
     </div>
   );

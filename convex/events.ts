@@ -262,7 +262,7 @@ export const createEvent = mutation({
     }
 
     const now = Date.now();
-    const hostRole = profile.role === "super_admin" ? "super_admin" : (profile.role === "admin" ? "admin" : "creator");
+    const hostRole = profile.role === "visitor" ? "user" : profile.role;
     const eventId = await ctx.db.insert("events", {
       ...args,
       createdByUserId: clerkUserId,

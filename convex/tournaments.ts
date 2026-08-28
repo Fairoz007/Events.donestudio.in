@@ -108,6 +108,8 @@ export const registerForActivity = mutation({
 
     const activity = await ctx.db.get(args.activityId);
     if (!activity) throw new Error("ACTIVITY_NOT_FOUND");
+    const event = await ctx.db.get(activity.eventId);
+    if (!event) throw new Error("EVENT_NOT_FOUND");
     if (activity.status !== "registration_open") throw new Error("REGISTRATION_CLOSED");
     if (activity.registrationCloseTime && activity.registrationCloseTime < Date.now()) {
       throw new Error("REGISTRATION_CLOSED");
@@ -157,6 +159,8 @@ export const generateTournamentBracket = mutation({
     const { identity, profile } = await requireAdmin(ctx);
     const activity = await ctx.db.get(args.activityId);
     if (!activity) throw new Error("ACTIVITY_NOT_FOUND");
+    const event = await ctx.db.get(activity.eventId);
+    if (!event) throw new Error("EVENT_NOT_FOUND");
     if (activity.status !== "registration_closed" && activity.status !== "closed") {
       throw new Error("REGISTRATION_MUST_BE_CLOSED");
     }
@@ -319,7 +323,7 @@ export const generateTournamentBracket = mutation({
         title: "Tournament bracket generated",
         message: `${activity.title} bracket is ready. Your match assignment will update automatically.`,
         type: "system",
-        link: `/events/onam-2026/bracket`,
+        link: `/events/${event.slug}/bracket`,
         isRead: false,
         createdAt: now,
       });
@@ -496,4 +500,3 @@ export const streamerDashboard = query({
     };
   },
 });
-
