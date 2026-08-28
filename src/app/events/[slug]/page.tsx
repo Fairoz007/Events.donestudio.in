@@ -1,10 +1,11 @@
 // @ts-nocheck
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { ArrowRight, CalendarClock, Users } from "lucide-react";
+import { ArrowRight, CalendarClock, Loader2, LogIn, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useStableNow } from "@/lib/useStableNow";
 
@@ -14,10 +15,36 @@ function fmt(value?: number) {
 }
 
 export default function OnamEventPage() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
   const now = useStableNow();
   const summary = useQuery(api.onam.getSummary, { now });
   const register = useMutation(api.onam.registerForOnam);
+  const ensureSetup = useMutation(api.onam.ensureEventSetup);
+  const my = useQuery(api.onam.getMyOnam, { now });
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regSuccess, setRegSuccess] = useState(false);
+
+  // Ensure settings + tournament documents exist (one-time setup via mutation)
+  useEffect(() => {
+    void ensureSetup();
+  }, [ensureSetup]);
+
+  const isRegistrationOpen = summary?.registrationStatus === "open";
+  const alreadyRegistered = !!my?.eventRegistration;
+
+  const handleRegister = async () => {
+    setRegLoading(true);
+    setRegError(null);
+    try {
+      await register();
+      setRegSuccess(true);
+    } catch (err: any) {
+      setRegError(err?.message || "Registration failed. Please try again.");
+    } finally {
+      setRegLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#080b0e]">
@@ -31,14 +58,29 @@ export default function OnamEventPage() {
             <p className="mt-5 text-lg text-slate-200 leading-relaxed">
               The grand Kerala cultural celebration presented by D-One Studio. Register once for ONAM 2026, then join Vadamvali, Digital Pookalam, and the Onam Cultural Quiz.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <button
-                disabled={!isSignedIn || summary?.registrationStatus !== "open"}
-                onClick={() => void register()}
-                className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
-              >
-                {summary?.registrationStatus === "open" ? "Register for ONAM 2026" : `Registration opens at ${fmt(summary?.settings.registrationOpensAt)}`}
-              </button>
+            <div className="mt-8 flex flex-wrap gap-3 items-start">
+              <div className="flex flex-col gap-1">
+                {!isLoaded ? (
+                  <div className="rounded-lg bg-slate-700 px-5 py-3 text-sm font-black text-slate-300 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                  </div>
+                ) : !isSignedIn ? (
+                  <Link href="/sign-in" className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 flex items-center gap-2 hover:bg-emerald-400 transition-colors">
+                    <LogIn className="w-4 h-4" /> Sign In to Register
+                  </Link>
+                ) : (
+                  <button
+                    disabled={!isRegistrationOpen || alreadyRegistered || regLoading}
+                    onClick={handleRegister}
+                    className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 flex items-center gap-2 transition-colors"
+                  >
+                    {regLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {alreadyRegistered || regSuccess ? "✓ Registered for ONAM 2026" : isRegistrationOpen ? "Register for ONAM 2026" : `Registration opens at ${fmt(summary?.settings?.registrationOpensAt)}`}
+                  </button>
+                )}
+                {regError && <p className="text-xs text-red-400">{regError}</p>}
+                {regSuccess && !alreadyRegistered && <p className="text-xs text-emerald-400">Registration successful!</p>}
+              </div>
               <Link href="/dashboard" className="rounded-lg border border-slate-700 px-5 py-3 text-sm font-black text-white hover:bg-slate-900">
                 My Onam
               </Link>
@@ -49,7 +91,7 @@ export default function OnamEventPage() {
             <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-5">
               <CalendarClock className="w-5 h-5 text-amber-300" />
               <div className="mt-3 text-xs font-bold uppercase text-slate-400">Registration</div>
-              <div className="mt-1 text-lg font-black text-white">{summary?.registrationStatus === "open" ? "REGISTRATION OPEN" : summary?.registrationStatus === "closed" ? "Closed" : fmt(summary?.settings.registrationOpensAt)}</div>
+              <div className="mt-1 text-lg font-black text-white">{isRegistrationOpen ? "REGISTRATION OPEN" : summary?.registrationStatus === "closed" ? "Closed" : summary === undefined ? "Loading…" : fmt(summary?.settings?.registrationOpensAt)}</div>
             </div>
             <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-5">
               <Users className="w-5 h-5 text-emerald-300" />
@@ -58,8 +100,8 @@ export default function OnamEventPage() {
             </div>
             <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-5">
               <div className="text-xs font-bold uppercase text-slate-400">Current / Next Activity</div>
-              <div className="mt-3 text-lg font-black text-white">{summary?.settings.currentActivity || "Registration"}</div>
-              <div className="text-sm text-slate-400">{summary?.settings.nextActivity || "Fixture generation"}</div>
+              <div className="mt-3 text-lg font-black text-white">{summary?.settings?.currentActivity || "Registration"}</div>
+              <div className="text-sm text-slate-400">{summary?.settings?.nextActivity || "Fixture generation"}</div>
             </div>
           </div>
 
